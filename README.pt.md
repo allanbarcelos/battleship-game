@@ -62,4 +62,4 @@ Este é um jogo de batalha naval multiplayer baseado em navegador, desenvolvido 
 Este projeto está licenciado sob a [MIT License](https://opensource.org/licenses/MIT).
 
 
-Esou aceitando patrocinio para novos projetos [Buy me a coffee](https://www.buymeacoffee.com/allanbarcelos)
+Estou aceitando patrocinio para novos projetos [Buy me a coffee](https://www.buymeacoffee.com/allanbarcelos)

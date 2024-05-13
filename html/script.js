@@ -5,18 +5,13 @@ console.log(`A resolução do monitor é ${screenWidth}x${screenHeight}.`);
 const api = ['127.0.0.1', 'localhost'].includes(window.location.hostname) ? `//${window.location.hostname}:3000`: `//${window.location.hostname}`;
 
 let grids = document.getElementsByClassName('grid');
-
 let squadGrid = document.getElementById('squad-grid');
 let oceanGrid = document.getElementById('ocean-grid');
-
 let startGameBtn = document.getElementById('startGame');
 let gameCodeInput = document.getElementById('gameCode');
-
 let squaresSquad = [];
 let squaresOcean = [];
-
 let occupiedSquares = [];
-
 let explosionAudio = new Audio('assets/explosion.mp3');
 let waterAudio = new Audio('assets/water.mp3');
 
@@ -52,28 +47,22 @@ let ships = [
 ];
 
 function createGrid() {
-
   let id = 1;
   for (let i = 1; i < 27; i++) {
     for (let j = 1; j < 27; j++) {
       Array.from(grids).forEach(e => {
-
         const square = document.createElement('div');
         square.id = (e.getAttribute('id') === 'squad-grid' ? 'squad' : 'ocean') + '-' + id;
         square.dataset.y = i;
         square.dataset.x = j;
-
         e.appendChild(square);
-
         if (e.getAttribute('id') === 'squad-grid')
           squaresSquad.push(square);
         else
           squaresOcean.push(square);
-
       });
       id++;
     }
-
   }
 }
 
@@ -81,35 +70,27 @@ function placePlayerShips() {
   ships.forEach(ship => {
     const direction = Math.random() < 0.5 ? 'h' : 'v';
     const frame = ship.frame[direction];
-
     let h = frame.split('E').length;
     let w = frame.split('E')[0].length;
     let x, y, randomIndex;
     let square;
     let occupied;
-
     do {
-
       occupied = false;
-
       do {
         randomIndex = Math.floor(Math.random() * 676);
         square = document.getElementById(`squad-${randomIndex}`);
         x = +square.getAttribute('data-x');
         y = +square.getAttribute('data-y');
       } while (h + y > 26 || w + x > 26);
-
       for (let j = y; j < (y + h) + 1; j++) {
         for (let i = x; i < (x + w) + 1; i++) {
           const _s = document.querySelector(`div[data-x="${i}"][data-y="${j}"]`);
-          if (_s)
-            if (occupiedSquares.includes(_s.id))
-              occupied = true;
+          if (_s && occupiedSquares.includes(_s.id))
+            occupied = true;
         }
       }
-
     } while (occupied);
-
     let k = 0;
     let firstSquareTop;
     let firstSquareLeft;
@@ -129,31 +110,23 @@ function placePlayerShips() {
         }
       }
     }
-
     const shipDiv = document.createElement('span');
     shipDiv.style.width = `${w * 23}px`;
     shipDiv.style.height = `${h * 23}px`;
     shipDiv.dataset.ship = `${ship.class}`;
-
     shipDiv.style.position = 'absolute';
-
     shipDiv.style.top = `${firstSquareTop}px`;
     shipDiv.style.left = `${firstSquareLeft}px`;
-
     shipDiv.classList.add(`sprite-${direction}`, `${ship.class}-${direction}`);
-
     squadGrid.appendChild(shipDiv);
-
   });
 }
 
-function sounds() {
+function sounds(res) {
   explosionAudio.pause();
   explosionAudio.currentTime = 0;
-
   waterAudio.pause();
   waterAudio.currentTime = 0;
-
   if (res.success) {
     ocean.classList.add('explosion');
     explosionAudio.play();
@@ -166,8 +139,6 @@ function sounds() {
 createGrid();
 placePlayerShips();
 
-// --
-
 const socket = io(`${api}`, {
   query: { token: localStorage.getItem("token") },
 });
@@ -178,45 +149,29 @@ socket.on("__connect", (res) => {
 
 socket.on("startGame", (res) => {
   const divHeader = document.getElementById('header');
-
   const _box = document.getElementById('box');
   if (_box)
     _box.remove();
-
   const box = document.createElement('div');
   box.id = "box";
-
   const code = document.createElement('p');
   code.id = "code";
   code.innerHTML = res.gameCode
-
   const msg = document.createElement('p');
   msg.id = "msg";
   msg.innerHTML = res.msg
-
   if (startGameBtn && gameCodeInput) {
     startGameBtn.remove();
     gameCodeInput.remove();
   }
-
   box.appendChild(msg);
   box.appendChild(code);
-
   divHeader.insertBefore(box, divHeader.firstChild);
-
 });
 
 socket.on("attack", (res) => {
-
   console.log(res);
   const squad = document.getElementById(res);
-
-  explosionAudio.pause();
-  explosionAudio.currentTime = 0;
-
-  waterAudio.pause();
-  waterAudio.currentTime = 0;
-
   if (occupiedSquares.includes(res)) {
     squad.classList.add('explosion');
     explosionAudio.play();
@@ -226,19 +181,10 @@ socket.on("attack", (res) => {
     waterAudio.play();
     socket.emit("hit", { hit: false, id: res });
   }
-
 });
 
 socket.on("hit", (res) => {
-
   const ocean = document.getElementById(res.id);
-
-  explosionAudio.pause();
-  explosionAudio.currentTime = 0;
-
-  waterAudio.pause();
-  waterAudio.currentTime = 0;
-
   if (res.hit) {
     ocean.classList.add('explosion');
     explosionAudio.play();
@@ -258,11 +204,7 @@ oceanGrid.addEventListener('click', function (e) {
   socket.emit("attack", square.id);
 });
 
-
-// MODAL
-
 const infoModal = document.getElementById('infoModal');
-
 const openModalBtns = document.getElementsByClassName('openModal');
 const closeModalBtn = document.getElementsByClassName('close')[0];
 
@@ -277,9 +219,3 @@ closeModalBtn.addEventListener('click', (e) => {
   if (e.target.dataset.modal = "info")
     infoModal.style.display = 'none';
 });
-
-// window.addEventListener('click', (e) => {
-//   if (e.target === infoModal) {
-//     infoModal.style.display = 'none';
-//   }
-// });

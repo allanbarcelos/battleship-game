@@ -32,7 +32,7 @@
   font-size: 1.6em;
   text-transform: uppercase;
   border: 1px solid #dedede;
-  background-color:beige;
+  background-color: beige;
 }
 
 .header button#info {
@@ -42,7 +42,11 @@
 }
 
 .header div#box {
-  grid-area: 2 / 2 / 3 / 6; 
+  grid-area: 2 / 2 / 3 / 6;
+}
+
+#buy-me-a-coffee {
+  grid-area: 1 / 1 / 2 / 3;
 }
 
 .header div#box p {
@@ -52,12 +56,26 @@
 
 }
 
-.header #player1 { grid-area: 3 / 1 / 4 / 3;  display: flex; justify-content: start; align-items: end;}
-.header #player2 { grid-area: 3 / 5 / 4 / 7; display: flex; justify-content: end; align-items: end;}
-.header #player1,#player2 span {
+.header #player1 {
+  grid-area: 3 / 1 / 4 / 3;
+  display: flex;
+  justify-content: start;
+  align-items: end;
+}
+
+.header #player2 {
+  grid-area: 3 / 5 / 4 / 7;
+  display: flex;
+  justify-content: end;
+  align-items: end;
+}
+
+.header #player1,
+#player2 span {
   font-size: 1.6em;
   text-transform: capitalize;
 }
+
 .grid {
   padding: 1px;
   display: grid;
@@ -195,10 +213,4 @@ button {
   color: black;
   text-decoration: none;
   cursor: pointer;
-}
-
-#buy-me-a-coffee{
-  position: absolute;
-  bottom: 0;
-  right: 100px;
 }

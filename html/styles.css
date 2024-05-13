@@ -1,0 +1,204 @@
+.container {
+  margin-top: 10px;
+  width: 100vw;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.header {
+  width: 598px;
+  height: 150px;
+  /* background-color: aquamarine; */
+  /* border: 1px solid #333; */
+
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  grid-column-gap: 0px;
+  grid-row-gap: 0px;
+}
+
+.header button#startGame {
+  grid-area: 2 / 2 / 3 / 4;
+  justify-self: stretch;
+}
+
+.header input#gameCode {
+  grid-area: 2 / 4 / 3 / 6;
+  width: 145px;
+  justify-self: stretch;
+  margin-top: 10px;
+  font-size: 1.6em;
+  text-transform: uppercase;
+  border: 1px solid #dedede;
+  background-color:beige;
+}
+
+.header button#info {
+  justify-self: end;
+  grid-area: 1 / 5 / 2 / 7;
+  margin-right: 5px;
+}
+
+.header div#box {
+  grid-area: 2 / 2 / 3 / 6; 
+}
+
+.header div#box p {
+  padding: 0;
+  margin: 0;
+  text-align: center;
+
+}
+
+.header #player1 { grid-area: 3 / 1 / 4 / 3;  display: flex; justify-content: start; align-items: end;}
+.header #player2 { grid-area: 3 / 5 / 4 / 7; display: flex; justify-content: end; align-items: end;}
+.header #player1,#player2 span {
+  font-size: 1.6em;
+  text-transform: capitalize;
+}
+.grid {
+  padding: 1px;
+  display: grid;
+  grid-template-columns: repeat(26, 1fr);
+  grid-gap: 1px;
+  border: 1px solid #333;
+  width: 598px;
+}
+
+#ocean-grid {
+  cursor: pointer;
+}
+
+.grid div {
+  background-color: rgb(213, 243, 253);
+  border: 1px solid #333;
+  height: 20px;
+  width: 20px;
+}
+
+.explosion {
+  z-index: 999;
+  background-image: url('assets/explosion.png');
+  /* caminho para a imagem */
+}
+
+.water {
+  z-index: 999;
+  background-image: url('assets/water.png');
+  /* caminho para a imagem */
+}
+
+button {
+  margin-top: 10px;
+  padding: 5px 10px;
+  font-size: 16px;
+}
+
+.occupied {
+  /* background-color: #333 !important; */
+}
+
+/*  */
+.sprite-h {
+  background-image: url('assets/battleships-h.png');
+  /* caminho para a imagem */
+  /* background-color: aqua;
+  opacity: 0.5; */
+
+}
+
+.sprite-h.cruzader-h {
+  background-position: -32px 3px;
+  /* posição do primeiro sprite */
+}
+
+.sprite-h.aircraft-h {
+  background-position: -8px -47px;
+  /* posição do segundo sprite */
+}
+
+.sprite-h.frigate-h {
+  background-position: -28px -114px;
+  /* posição do segundo sprite */
+}
+
+.sprite-h.submarine-h {
+  background-position: -175px -74px;
+  /* posição do segundo sprite */
+}
+
+/*  */
+.sprite-v {
+  background-image: url('assets/battleships-v.png');
+  /* caminho para a imagem */
+  /* background-color: aqua;
+  opacity: 0.5; */
+
+}
+
+.sprite-v.cruzader-v {
+  background-position: 4px 190px;
+  /* posição do primeiro sprite */
+}
+
+.sprite-v.aircraft-v {
+  background-position: -48px 170px;
+  /* posição do segundo sprite */
+}
+
+.sprite-v.frigate-v {
+  background-position: -113px 189px;
+  /* posição do segundo sprite */
+}
+
+
+.sprite-v.submarine-v {
+  background-position: -74px 310px;
+  /* posição do segundo sprite */
+}
+
+
+/*  */
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+  background-color: #fefefe;
+  margin: 15% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%;
+  max-width: 400px;
+  text-align: center;
+}
+
+.close {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+#buy-me-a-coffee{
+  position: absolute;
+  bottom: 0;
+  right: 100px;
+}

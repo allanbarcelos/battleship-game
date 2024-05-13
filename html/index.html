@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batalha Naval</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <div id="header" class="header">
+            <button type="button" id="startGame">Start Game</button>
+            <input type="text" id="gameCode" maxlength="10" minlength="10">
+            <button type="button" id="info" class="openModal" data-modal="info">
+                <i class="fa fa-question-circle" aria-hidden="true"></i>
+            </button>
+            <div id="player1">
+                <span>Your Squad</span>
+            </div>
+            <div id="player2">
+                <span>Ocean</span>
+            </div>
+        </div>
+    </div>
+    <div class="container center">
+        <div class="grid" id="squad-grid"></div>
+        <div class="grid" id="ocean-grid"></div>
+    </div>
+
+
+    <!--  -->
+    <div id="infoModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <p>Modal Content Here</p>
+        </div>
+    </div>
+
+    <a id="buy-me-a-coffee" href="https://www.buymeacoffee.com/allanbarcelos" target="_blank">
+        <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee"
+            style="height: 30px !important;width: 123px !important;margin-bottom: 5px;">
+    </a>
+
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

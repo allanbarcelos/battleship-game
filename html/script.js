@@ -2,8 +2,7 @@ const screenWidth = window.screen.width;
 const screenHeight = window.screen.height;
 console.log(`A resolução do monitor é ${screenWidth}x${screenHeight}.`);
 
-
-const api = `//${window.location.hostname}:3000`;
+const api = ['http://127.0.0.1', 'http://localhost'].includes(window.location.hostname) ? `//${window.location.hostname}:3000`: `//${window.location.hostname}:3000`;
 
 let grids = document.getElementsByClassName('grid');
 

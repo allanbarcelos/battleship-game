@@ -1,8 +1,10 @@
-const screenWidth = window.screen.width;
-const screenHeight = window.screen.height;
-console.log(`A resolução do monitor é ${screenWidth}x${screenHeight}.`);
+/*
+ * Battleship Game Script
+ * Author: Allan Barcelos
+ * Description: This script implements a multiplayer battleship game using Socket.IO.
+ */
 
-const api = ['127.0.0.1', 'localhost'].includes(window.location.hostname) ? `//${window.location.hostname}:3000`: `//${window.location.hostname}`;
+const api = ['127.0.0.1', 'localhost'].includes(window.location.hostname) ? `//${window.location.hostname}:3000` : `//${window.location.hostname}`;
 
 let grids = document.getElementsByClassName('grid');
 let squadGrid = document.getElementById('squad-grid');
@@ -143,10 +145,6 @@ const socket = io(`${api}`, {
   query: { token: localStorage.getItem("token") },
 });
 
-socket.on("__connect", (res) => {
-  console.log(res);
-});
-
 socket.on("startGame", (res) => {
   const divHeader = document.getElementById('header');
   const _box = document.getElementById('box');
@@ -219,3 +217,11 @@ closeModalBtn.addEventListener('click', (e) => {
   if (e.target.dataset.modal = "info")
     infoModal.style.display = 'none';
 });
+
+// --
+
+const screenWidth = window.screen.width;
+const screenHeight = window.screen.height;
+if (screenWidth < 1440 && screenHeight < 900) {
+  alert('A minimum resolution of 1440x900 is recommended.');
+}

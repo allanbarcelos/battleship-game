@@ -55,7 +55,7 @@ This is a multiplayer online Battleship game, developed with HTML, CSS, JavaScri
 
 ## Authors
 
-- Your Name
+- Allan Barcelos
 
 ## License
 

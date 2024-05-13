@@ -55,7 +55,7 @@ Este é um jogo de batalha naval multiplayer baseado em navegador, desenvolvido 
 
 ## Autores
 
-- Seu Nome
+- Allan Barcelos
 
 ## Licença
 

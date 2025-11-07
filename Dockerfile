@@ -1,22 +1,30 @@
-FROM node:18
+FROM node:18 AS builder
 
-# Install system dependencies for canvas
-RUN apt-get update && apt-get install -y libcairo2-dev libjpeg-dev libgif-dev librsvg2-dev libpango1.0-dev
+RUN apt-get update && apt-get install -y \
+  libcairo2-dev libjpeg-dev libgif-dev librsvg2-dev libpango1.0-dev \
+  && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /usr/api
+WORKDIR /usr/src/app
 
 COPY api/package*.json ./
-
 RUN npm install -g nodemon
-RUN npm i
+RUN npm install
 RUN npm rebuild @tensorflow/tfjs-node --build-from-source
 
-COPY api/* .
+COPY api/ .
 
-# Copy the .env file to the Docker container
-COPY .env .
+FROM nginx:latest
 
-ENV PORT $PORT
-EXPOSE $PORT
+COPY --from=builder /usr/src/app /usr/src/app
 
-CMD ["npm", "start"]
+COPY html /usr/share/nginx/html
+
+COPY nginx/conf.d /etc/nginx/conf.d
+
+EXPOSE 80
+
+RUN apt-get update && apt-get install -y supervisor && mkdir -p /var/log/supervisor
+
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+CMD ["/usr/bin/supervisord"]

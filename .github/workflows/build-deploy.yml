@@ -139,22 +139,24 @@ jobs:
           echo "Preparing deployment for services: ${{ join(needs.discover-dockerfiles.outputs.dockerfiles, ', ') }}"
           
           # Generate service list for deployment using jq
-          SERVICES_JSON=$(echo '${{ needs.discover-dockerfiles.outputs.dockerfiles }}' | jq -c '
+          DOCKERFILES='${{ needs.discover-dockerfiles.outputs.dockerfiles }}'
+          REPO_NAME='${{ needs.set-environment.outputs.repository_name }}'
+          HAS_ROOT='${{ needs.set-environment.outputs.has_root_dockerfile }}'
+          MAIN_SERVICE='${{ needs.set-environment.outputs.main_service }}'
+          
+          SERVICES_JSON=$(echo "$DOCKERFILES" | jq -c --arg repo "$REPO_NAME" --arg has_root "$HAS_ROOT" --arg main_service "$MAIN_SERVICE" '
             map(
               if . == "." then
                 {
-                  "name": "'${{ needs.set-environment.outputs.repository_name }}'",
+                  "name": $repo,
                   "dir": ".",
-                  "is_main": ("'${{ needs.set-environment.outputs.has_root_dockerfile }}'" == "true")
+                  "is_main": ($has_root == "true")
                 }
               else
                 {
-                  "name": "'${{ needs.set-environment.outputs.repository_name }}'-" + .,
+                  "name": ($repo + "-" + .),
                   "dir": .,
-                  "is_main": (
-                    ("'${{ needs.set-environment.outputs.has_root_dockerfile }}'" == "false") and 
-                    (. == "'${{ needs.set-environment.outputs.main_service }}'")
-                  )
+                  "is_main": (($has_root == "false") and (. == $main_service))
                 }
               end
             )

@@ -147,7 +147,6 @@ const socket = io(host, {
   query: {
     token: localStorage.getItem("token")
   },
-  transports: ['websocket'] 
 });
 
 socket.on("startGame", (res) => {

@@ -4,8 +4,6 @@
  * Description: This script implements a multiplayer battleship game using Socket.IO.
  */
 
-const api = ['127.0.0.1', 'localhost'].includes(window.location.hostname) ? `//${window.location.hostname}:3000` : `//${window.location.hostname}`;
-
 let grids = document.getElementsByClassName('grid');
 let squadGrid = document.getElementById('squad-grid');
 let oceanGrid = document.getElementById('ocean-grid');
@@ -140,8 +138,7 @@ function sounds(res) {
 
 createGrid();
 placePlayerShips();
-
-const socket = io(`${api}`, {
+const socket = io(`${window.location.origin}${window.location.pathname}`, {
   query: { token: localStorage.getItem("token") },
 });
 

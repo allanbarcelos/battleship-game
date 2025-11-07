@@ -264,7 +264,7 @@ jobs:
             echo -e "$ROLLBACK_INFO" > /tmp/rollback.env
             echo "Rollback information saved."
 
-            - name: Deploy all containers
+      - name: Deploy all containers
         id: deploy
         uses: appleboy/ssh-action@v0.1.9
         env:

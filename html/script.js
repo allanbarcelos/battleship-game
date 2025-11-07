@@ -138,8 +138,16 @@ function sounds(res) {
 
 createGrid();
 placePlayerShips();
-const socket = io(`${window.location.origin}${window.location.pathname}`, {
-  query: { token: localStorage.getItem("token") },
+
+const host = window.location.origin;
+const pathname = window.location.pathname.replace(/\/$/, '');
+
+const socket = io(host, {
+  path: `${pathname}/socket.io`,
+  query: {
+    token: localStorage.getItem("token")
+  },
+  transports: ['websocket'] 
 });
 
 socket.on("startGame", (res) => {

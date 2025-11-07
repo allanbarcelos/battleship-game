@@ -264,7 +264,7 @@ jobs:
             echo -e "$ROLLBACK_INFO" > /tmp/rollback.env
             echo "Rollback information saved."
 
-      - name: Deploy all containers
+            - name: Deploy all containers
         id: deploy
         uses: appleboy/ssh-action@v0.1.9
         env:
@@ -276,10 +276,10 @@ jobs:
           username: ${{ secrets.SSH_USR }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PRT }}
-          envs: gh_actor,repository_name,main_network,repo_network,ssh_usr,services_json,gh_token
+          envs: gh_token,repository_name,main_network,repo_network,ssh_usr,services_json
           script: |
             echo "🔐 Logging in to GitHub Container Registry..."
-            echo "$gh_token" | docker login ghcr.io -u "$gh_actor" --password-stdin
+            echo "$gh_token" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
             # Parse services JSON
             SERVICES=$(echo "$services_json" | jq -c '.[]')
@@ -293,17 +293,8 @@ jobs:
               
               if [ "$SERVICE_DIR" = "." ]; then
                 IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
-                echo "Using root image: $IMAGE_NAME"
               else
-                # Clean service directory name and ensure no trailing hyphens
-                CLEAN_SERVICE_DIR=$(echo "$SERVICE_DIR" | sed 's/^\.\///' | tr -d './')
-                if [ -n "$CLEAN_SERVICE_DIR" ]; then
-                  IMAGE_NAME="ghcr.io/${{ github.repository }}-${CLEAN_SERVICE_DIR}:latest"
-                  echo "Using service image: $IMAGE_NAME"
-                else
-                  echo "❌ Invalid service directory: $SERVICE_DIR"
-                  exit 1
-                fi
+                IMAGE_NAME="ghcr.io/${{ github.repository }}-$SERVICE_DIR:latest"
               fi
               
               echo "Pulling image: $IMAGE_NAME"

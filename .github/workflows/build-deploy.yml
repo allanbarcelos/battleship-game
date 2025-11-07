@@ -22,17 +22,17 @@ jobs:
         run: |
           # Find all Dockerfiles and their directories
           DOCKERFILES=$(find . -name "Dockerfile" -type f | sed 's|./||' | sed 's|/Dockerfile||' | grep -v "^\.$")
-          
           ROOT_DOCKERFILE=$(find . -maxdepth 1 -name "Dockerfile" -type f)
           
-          # Convert to JSON array for output - handle root Dockerfile properly
+          # Convert to JSON array for output
+          DOCKERFILES_JSON=$(echo "$DOCKERFILES" | jq -R -s -c 'split("\n") | map(select(. != ""))')
+          echo "dockerfiles=$DOCKERFILES_JSON" >> $GITHUB_OUTPUT
+          
+          # Check if root Dockerfile exists
           if [ -n "$ROOT_DOCKERFILE" ]; then
-            # Include root as "root" instead of "."
-            DOCKERFILES_JSON=$(echo -e "root\n$DOCKERFILES" | jq -R -s -c 'split("\n") | map(select(. != "" and . != "."))')
             echo "has_root_dockerfile=true" >> $GITHUB_OUTPUT
             echo "main_service=root" >> $GITHUB_OUTPUT
           else
-            DOCKERFILES_JSON=$(echo "$DOCKERFILES" | jq -R -s -c 'split("\n") | map(select(. != ""))')
             echo "has_root_dockerfile=false" >> $GITHUB_OUTPUT
             # Determine main service (app or web)
             if echo "$DOCKERFILES" | grep -q "app"; then
@@ -46,7 +46,6 @@ jobs:
             fi
           fi
           
-          echo "dockerfiles=$DOCKERFILES_JSON" >> $GITHUB_OUTPUT
           echo "Found Dockerfiles: $DOCKERFILES_JSON"
           echo "Has root Dockerfile: ${{ steps.find-dockerfiles.outputs.has_root_dockerfile }}"
           echo "Main service: ${{ steps.find-dockerfiles.outputs.main_service }}"
@@ -90,27 +89,25 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}  # Fixed: use github.actor directly
-          password: ${{ secrets.GITHUB_TOKEN }}  # Fixed: use GITHUB_TOKEN
+          username: ${{ env.gh_actor }}
+          password: ${{ secrets.GH_TOKEN }}
 
-      - name: Determine image name and service name
+      - name: Determine image name
         id: image-name
         run: |
-          if [ "${{ matrix.service }}" = "root" ]; then
+          if [ "${{ matrix.service }}" = "." ]; then
             IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
-            SERVICE_NAME="${{ needs.set-environment.outputs.repository_name }}"
+            echo "service_name=${{ needs.set-environment.outputs.repository_name }}" >> $GITHUB_OUTPUT
           else
             IMAGE_NAME="ghcr.io/${{ github.repository }}-${{ matrix.service }}:latest"
-            SERVICE_NAME="${{ needs.set-environment.outputs.repository_name }}-${{ matrix.service }}"
+            echo "service_name=${{ needs.set-environment.outputs.repository_name }}-${{ matrix.service }}" >> $GITHUB_OUTPUT
           fi
           echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
-          echo "service_name=$SERVICE_NAME" >> $GITHUB_OUTPUT
-          echo "service_dir=${{ matrix.service }}" >> $GITHUB_OUTPUT
-          echo "Building image: $IMAGE_NAME for service: $SERVICE_NAME"
+          echo "Building image: $IMAGE_NAME"
 
       - name: Build Docker image
         run: |
-          if [ "${{ matrix.service }}" = "root" ]; then
+          if [ "${{ matrix.service }}" = "." ]; then
             docker build -t ${{ steps.image-name.outputs.image_name }} .
           else
             docker build -t ${{ steps.image-name.outputs.image_name }} ./${{ matrix.service }}
@@ -118,6 +115,11 @@ jobs:
 
       - name: Push Docker image
         run: docker push ${{ steps.image-name.outputs.image_name }}
+
+      - name: Save image info
+        run: |
+          echo "SERVICE_${{ matrix.service }}_IMAGE=${{ steps.image-name.outputs.image_name }}" >> $GITHUB_ENV
+          echo "SERVICE_${{ matrix.service }}_NAME=${{ steps.image-name.outputs.service_name }}" >> $GITHUB_ENV
 
   deploy:
     runs-on: ubuntu-latest
@@ -144,19 +146,17 @@ jobs:
           
           SERVICES_JSON=$(echo "$DOCKERFILES" | jq -c --arg repo "$REPO_NAME" --arg has_root "$HAS_ROOT" --arg main_service "$MAIN_SERVICE" '
             map(
-              if . == "root" then
+              if . == "." then
                 {
                   "name": $repo,
-                  "dir": "root",
-                  "is_main": true,
-                  "image": ("ghcr.io/" + $repo + ":latest")
+                  "dir": ".",
+                  "is_main": ($has_root == "true")
                 }
               else
                 {
                   "name": ($repo + "-" + .),
                   "dir": .,
-                  "is_main": (. == $main_service),
-                  "image": ("ghcr.io/" + $repo + "-" + . + ":latest")
+                  "is_main": (($has_root == "false") and (. == $main_service))
                 }
               end
             )
@@ -264,7 +264,7 @@ jobs:
             echo -e "$ROLLBACK_INFO" > /tmp/rollback.env
             echo "Rollback information saved."
 
-            - name: Deploy all containers
+      - name: Deploy all containers
         id: deploy
         uses: appleboy/ssh-action@v0.1.9
         env:
@@ -277,11 +277,8 @@ jobs:
           port: ${{ secrets.SSH_PRT }}
           envs: gh_actor,repository_name,main_network,repo_network,ssh_usr,services_json
           script: |
-            set -e  # Exit on error
-            set -u  # Exit on undefined variables
-            
             echo "🔐 Logging in to GitHub Container Registry..."
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "$gh_actor" --password-stdin
+            echo "${{ secrets.GH_TOKEN }}" | docker login ghcr.io -u "$gh_actor" --password-stdin
 
             # Parse services JSON
             SERVICES=$(echo "$services_json" | jq -c '.[]')
@@ -291,15 +288,21 @@ jobs:
             while IFS= read -r service; do
               SERVICE_NAME=$(echo "$service" | jq -r '.name')
               SERVICE_DIR=$(echo "$service" | jq -r '.dir')
-              IMAGE_NAME=$(echo "$service" | jq -r '.image')
+              IS_MAIN=$(echo "$service" | jq -r '.is_main')
+              
+              if [ "$SERVICE_DIR" = "." ]; then
+                IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
+              else
+                IMAGE_NAME="ghcr.io/${{ github.repository }}-$SERVICE_DIR:latest"
+              fi
               
               echo "Pulling image: $IMAGE_NAME"
-              docker pull "$IMAGE_NAME" || echo "Warning: Failed to pull $IMAGE_NAME"
+              docker pull "$IMAGE_NAME"
             done <<< "$SERVICES"
 
             # Then, stop and remove old containers
             echo "🛑 Stopping old containers..."
-            OLD_CONTAINERS=$(docker ps -a --filter "name=$repository_name" --format "{{.Names}}" | grep -E "^$repository_name(-[a-zA-Z0-9_-]+)?$" || true)
+            OLD_CONTAINERS=$(docker ps -a --filter "name=$repository_name" --format "{{.Names}}")
             for container in $OLD_CONTAINERS; do
               echo "Stopping and removing: $container"
               docker stop "$container" 2>/dev/null || true
@@ -312,20 +315,14 @@ jobs:
               SERVICE_NAME=$(echo "$service" | jq -r '.name')
               SERVICE_DIR=$(echo "$service" | jq -r '.dir')
               IS_MAIN=$(echo "$service" | jq -r '.is_main')
-              IMAGE_NAME=$(echo "$service" | jq -r '.image')
+              
+              if [ "$SERVICE_DIR" = "." ]; then
+                IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
+              else
+                IMAGE_NAME="ghcr.io/${{ github.repository }}-$SERVICE_DIR:latest"
+              fi
               
               echo "Starting container: $SERVICE_NAME from $IMAGE_NAME"
-              
-              # Validate service name and image name
-              if [ -z "$SERVICE_NAME" ] || [ "$SERVICE_NAME" = "null" ]; then
-                echo "❌ ERROR: Invalid service name: $SERVICE_NAME"
-                exit 1
-              fi
-              
-              if [ -z "$IMAGE_NAME" ] || [ "$IMAGE_NAME" = "null" ]; then
-                echo "❌ ERROR: Invalid image name: $IMAGE_NAME"
-                exit 1
-              fi
               
               # Base run command
               RUN_CMD="docker run -d --name \"$SERVICE_NAME\" --restart unless-stopped"
@@ -344,7 +341,7 @@ jobs:
               RUN_CMD="$RUN_CMD \"$IMAGE_NAME\""
               
               echo "Running: $RUN_CMD"
-              eval "$RUN_CMD" || echo "Warning: Container $SERVICE_NAME might have issues starting"
+              eval "$RUN_CMD"
               
             done <<< "$SERVICES"
 
@@ -355,20 +352,18 @@ jobs:
             ALL_RUNNING=true
             while IFS= read -r service; do
               SERVICE_NAME=$(echo "$service" | jq -r '.name')
-              if docker inspect -f '{{.State.Running}}' "$SERVICE_NAME" 2>/dev/null | grep -q true; then
+              if docker inspect -f '{{.State.Running}}' "$SERVICE_NAME" | grep -q true; then
                 echo "✅ Container $SERVICE_NAME started successfully."
               else
                 echo "❌ Container $SERVICE_NAME failed to start."
                 ALL_RUNNING=false
-                # Show logs for failed container
-                docker logs "$SERVICE_NAME" 2>/dev/null || echo "No logs available for $SERVICE_NAME"
               fi
             done <<< "$SERVICES"
 
             if [ "$ALL_RUNNING" = true ]; then
               echo "✅ All containers started successfully."
               # Restart nginx only if there's a main service
-              MAIN_SERVICE_EXISTS=$(echo "$services_json" | jq 'map(select(.is_main == true)) | length')
+              MAIN_SERVICE_EXISTS=$(echo "$services_json" | jq 'map(select(.is_main == "true")) | length')
               if [ "$MAIN_SERVICE_EXISTS" -gt 0 ]; then
                 sudo systemctl restart nginx
                 echo "✅ Nginx restarted."

@@ -270,15 +270,16 @@ jobs:
         env:
           ssh_usr: ${{ secrets.SSH_USR }}
           services_json: ${{ steps.setup.outputs.services_json }}
+          gh_token: ${{ secrets.GH_TOKEN }}
         with:
           host: ${{ secrets.SSH_HST }}
           username: ${{ secrets.SSH_USR }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PRT }}
-          envs: gh_actor,repository_name,main_network,repo_network,ssh_usr,services_json
+          envs: gh_actor,repository_name,main_network,repo_network,ssh_usr,services_json,gh_token
           script: |
             echo "🔐 Logging in to GitHub Container Registry..."
-            echo "${{ secrets.GH_TOKEN }}" | docker login ghcr.io -u "$gh_actor" --password-stdin
+            echo "$gh_token" | docker login ghcr.io -u "$gh_actor" --password-stdin
 
             # Parse services JSON
             SERVICES=$(echo "$services_json" | jq -c '.[]')
@@ -292,8 +293,17 @@ jobs:
               
               if [ "$SERVICE_DIR" = "." ]; then
                 IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
+                echo "Using root image: $IMAGE_NAME"
               else
-                IMAGE_NAME="ghcr.io/${{ github.repository }}-$SERVICE_DIR:latest"
+                # Clean service directory name and ensure no trailing hyphens
+                CLEAN_SERVICE_DIR=$(echo "$SERVICE_DIR" | sed 's/^\.\///' | tr -d './')
+                if [ -n "$CLEAN_SERVICE_DIR" ]; then
+                  IMAGE_NAME="ghcr.io/${{ github.repository }}-${CLEAN_SERVICE_DIR}:latest"
+                  echo "Using service image: $IMAGE_NAME"
+                else
+                  echo "❌ Invalid service directory: $SERVICE_DIR"
+                  exit 1
+                fi
               fi
               
               echo "Pulling image: $IMAGE_NAME"

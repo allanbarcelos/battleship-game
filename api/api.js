@@ -29,7 +29,7 @@ let rooms = {};
 let sockets = {};
 
 // Rotas
-app.get("/api/", async (req, res) => {
+app.get("/", async (req, res) => {
     res.json({ message: "BattleshipGame API" });
 });
 

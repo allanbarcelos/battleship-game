@@ -136,28 +136,30 @@ jobs:
       - name: Setup deployment environment
         id: setup
         run: |
-          # Create a mapping of services to images
           echo "Preparing deployment for services: ${{ join(needs.discover-dockerfiles.outputs.dockerfiles, ', ') }}"
           
-          # Generate service list for deployment
-          SERVICES_JSON='[]'
-          for service in ${{ join(needs.discover-dockerfiles.outputs.dockerfiles, ' ') }}; do
-            if [ "$service" = "." ]; then
-              SERVICE_NAME="${{ needs.set-environment.outputs.repository_name }}"
-              IS_MAIN="true"
-            else
-              SERVICE_NAME="${{ needs.set-environment.outputs.repository_name }}-$service"
-              # Determine if this is the main service
-              if [ "${{ needs.set-environment.outputs.has_root_dockerfile }}" = "true" ] && [ "$service" = "." ]; then
-                IS_MAIN="true"
-              elif [ "${{ needs.set-environment.outputs.has_root_dockerfile }}" = "false" ] && [ "$service" = "${{ needs.set-environment.outputs.main_service }}" ]; then
-                IS_MAIN="true"
+          # Generate service list for deployment using jq
+          SERVICES_JSON=$(echo '${{ needs.discover-dockerfiles.outputs.dockerfiles }}' | jq -c '
+            map(
+              if . == "." then
+                {
+                  "name": "'${{ needs.set-environment.outputs.repository_name }}'",
+                  "dir": ".",
+                  "is_main": ("'${{ needs.set-environment.outputs.has_root_dockerfile }}'" == "true")
+                }
               else
-                IS_MAIN="false"
-              fi
-            fi
-            SERVICES_JSON=$(echo "$SERVICES_JSON" | jq --arg name "$SERVICE_NAME" --arg service "$service" --arg is_main "$IS_MAIN" '. + [{"name": $name, "dir": $service, "is_main": $is_main}]')
-          done
+                {
+                  "name": "'${{ needs.set-environment.outputs.repository_name }}'-" + .,
+                  "dir": .,
+                  "is_main": (
+                    ("'${{ needs.set-environment.outputs.has_root_dockerfile }}'" == "false") and 
+                    (. == "'${{ needs.set-environment.outputs.main_service }}'")
+                  )
+                }
+              end
+            )
+          ')
+          
           echo "services_json=$SERVICES_JSON" >> $GITHUB_OUTPUT
           echo "Services to deploy: $SERVICES_JSON"
 

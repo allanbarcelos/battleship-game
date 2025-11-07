@@ -4,12 +4,10 @@ RUN npm install -g pm2
 
 WORKDIR /app
 
-COPY /api/package*.json ./
-COPY /api/*.js ./
+COPY package*.json ./
+COPY *.js ./
 
 RUN npm install --production
-
-COPY /api/ecosystem.config.js ./
 
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S battleship -u 1001

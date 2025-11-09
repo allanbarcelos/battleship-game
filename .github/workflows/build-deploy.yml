@@ -76,7 +76,7 @@ jobs:
     needs: [discover-dockerfiles, set-environment]
     strategy:
       matrix:
-        service: ${{ fromJson(needs.discover-dockerfiles.outputs.dockerfiles) }}
+        service: ${{ needs.discover-dockerfiles.outputs.dockerfiles }}
     env:
       repository_name: ${{ needs.set-environment.outputs.repository_name }}
       gh_actor: ${{ needs.set-environment.outputs.gh_actor }}

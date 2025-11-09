@@ -1,8 +1,13 @@
 /*
  * Battleship Game Script
  * Author: Allan Barcelos
- * Description: This script implements a multiplayer battleship game using Socket.IO.
+ * Description: Multiplayer Battleship game with Socket.IO
  */
+
+const host = window.location.origin;
+const apiBase = `${host}/api`;
+// Remover o socketPath ou ajustar conforme necessário
+// const socketPath = '/socket.io';
 
 let grids = document.getElementsByClassName('grid');
 let squadGrid = document.getElementById('squad-grid');
@@ -16,34 +21,10 @@ let explosionAudio = new Audio('assets/explosion.mp3');
 let waterAudio = new Audio('assets/water.mp3');
 
 let ships = [
-  {
-    class: 'cruzader',
-    frame: {
-      h: '0010000E1111111',
-      v: '01E01E01E11E01E01E01',
-    }
-  },
-  {
-    class: 'aircraft',
-    frame: {
-      h: '1111100E1111111E1111100',
-      v: '010E010E111E111E111E111E111'
-    }
-  },
-  {
-    class: 'frigate',
-    frame: {
-      h: '0011100E1111111',
-      v: '01E01E11E11E11E01E01'
-    }
-  },
-  {
-    class: 'submarine',
-    frame: {
-      h: '000100E111111',
-      v: '01E01E11E01E01E01'
-    }
-  },
+  { class: 'cruzader', frame: { h: '0010000E1111111', v: '01E01E01E11E01E01E01' } },
+  { class: 'aircraft', frame: { h: '1111100E1111111E1111100', v: '010E010E111E111E111E111E111' } },
+  { class: 'frigate', frame: { h: '0011100E1111111', v: '01E01E11E11E11E01E01' } },
+  { class: 'submarine', frame: { h: '000100E111111', v: '01E01E11E01E01E01' } },
 ];
 
 function createGrid() {
@@ -52,14 +33,12 @@ function createGrid() {
     for (let j = 1; j < 27; j++) {
       Array.from(grids).forEach(e => {
         const square = document.createElement('div');
-        square.id = (e.getAttribute('id') === 'squad-grid' ? 'squad' : 'ocean') + '-' + id;
+        square.id = (e.id === 'squad-grid' ? 'squad' : 'ocean') + '-' + id;
         square.dataset.y = i;
         square.dataset.x = j;
         e.appendChild(square);
-        if (e.getAttribute('id') === 'squad-grid')
-          squaresSquad.push(square);
-        else
-          squaresOcean.push(square);
+        if (e.id === 'squad-grid') squaresSquad.push(square);
+        else squaresOcean.push(square);
       });
       id++;
     }
@@ -80,22 +59,20 @@ function placePlayerShips() {
       do {
         randomIndex = Math.floor(Math.random() * 676);
         square = document.getElementById(`squad-${randomIndex}`);
-        x = +square.getAttribute('data-x');
-        y = +square.getAttribute('data-y');
+        x = +square.dataset.x;
+        y = +square.dataset.y;
       } while (h + y > 26 || w + x > 26);
-      for (let j = y; j < (y + h) + 1; j++) {
-        for (let i = x; i < (x + w) + 1; i++) {
+      for (let j = y; j < y + h + 1; j++) {
+        for (let i = x; i < x + w + 1; i++) {
           const _s = document.querySelector(`div[data-x="${i}"][data-y="${j}"]`);
-          if (_s && occupiedSquares.includes(_s.id))
-            occupied = true;
+          if (_s && occupiedSquares.includes(_s.id)) occupied = true;
         }
       }
     } while (occupied);
-    let k = 0;
-    let firstSquareTop;
-    let firstSquareLeft;
-    for (let j = y; j < (y + h) + 1; j++) {
-      for (let i = x; i < (x + w) + 1; i++) {
+
+    let k = 0, firstSquareTop, firstSquareLeft;
+    for (let j = y; j < y + h + 1; j++) {
+      for (let i = x; i < x + w + 1; i++) {
         const _s = document.querySelector(`div[data-x="${i}"][data-y="${j}"]`);
         if (_s) {
           if (j === y && i === x) {
@@ -110,10 +87,11 @@ function placePlayerShips() {
         }
       }
     }
+
     const shipDiv = document.createElement('span');
     shipDiv.style.width = `${w * 23}px`;
     shipDiv.style.height = `${h * 23}px`;
-    shipDiv.dataset.ship = `${ship.class}`;
+    shipDiv.dataset.ship = ship.class;
     shipDiv.style.position = 'absolute';
     shipDiv.style.top = `${firstSquareTop}px`;
     shipDiv.style.left = `${firstSquareLeft}px`;
@@ -123,56 +101,44 @@ function placePlayerShips() {
 }
 
 function sounds(res) {
-  explosionAudio.pause();
-  explosionAudio.currentTime = 0;
-  waterAudio.pause();
-  waterAudio.currentTime = 0;
-  if (res.success) {
-    ocean.classList.add('explosion');
-    explosionAudio.play();
-  } else {
-    ocean.classList.add('water');
-    waterAudio.play();
-  }
+  explosionAudio.pause(); explosionAudio.currentTime = 0;
+  waterAudio.pause(); waterAudio.currentTime = 0;
+  if (res.success) explosionAudio.play();
+  else waterAudio.play();
 }
 
 createGrid();
 placePlayerShips();
 
-const host = window.location.origin;
-const pathname = window.location.pathname.replace(/\/$/, '');
-
+// --- Socket.IO - Configuração Corrigida
 const socket = io(host, {
-  path: `${pathname}/socket.io`,
-  query: {
-    token: localStorage.getItem("token")
-  },
+  path: '/socket.io',
+  transports: ['websocket', 'polling'], // Forçar ambos os transportes
+  withCredentials: false
 });
 
-socket.on("startGame", (res) => {
+socket.on("connect", () => {
+  console.log('Conectado ao servidor Socket.IO');
+});
+
+socket.on("connect_error", (error) => {
+  console.error('Erro de conexão Socket.IO:', error);
+});
+
+socket.on("startGame", res => {
   const divHeader = document.getElementById('header');
   const _box = document.getElementById('box');
-  if (_box)
-    _box.remove();
+  if (_box) _box.remove();
   const box = document.createElement('div');
   box.id = "box";
-  const code = document.createElement('p');
-  code.id = "code";
-  code.innerHTML = res.gameCode
-  const msg = document.createElement('p');
-  msg.id = "msg";
-  msg.innerHTML = res.msg
-  if (startGameBtn && gameCodeInput) {
-    startGameBtn.remove();
-    gameCodeInput.remove();
-  }
-  box.appendChild(msg);
-  box.appendChild(code);
+  const code = document.createElement('p'); code.id = "code"; code.textContent = res.gameCode;
+  const msg = document.createElement('p'); msg.id = "msg"; msg.textContent = res.msg;
+  if (startGameBtn && gameCodeInput) { startGameBtn.remove(); gameCodeInput.remove(); }
+  box.appendChild(msg); box.appendChild(code);
   divHeader.insertBefore(box, divHeader.firstChild);
 });
 
-socket.on("attack", (res) => {
-  console.log(res);
+socket.on("attack", res => {
   const squad = document.getElementById(res);
   if (occupiedSquares.includes(res)) {
     squad.classList.add('explosion');
@@ -185,7 +151,7 @@ socket.on("attack", (res) => {
   }
 });
 
-socket.on("hit", (res) => {
+socket.on("hit", res => {
   const ocean = document.getElementById(res.id);
   if (res.hit) {
     ocean.classList.add('explosion');
@@ -196,36 +162,41 @@ socket.on("hit", (res) => {
   }
 });
 
-startGameBtn.addEventListener('click', function () {
-  const gameCode = gameCodeInput.value;
-  socket.emit("startGame", { gameCode });
-});
+// --- Eventos do DOM
+if (startGameBtn) {
+  startGameBtn.addEventListener('click', () => {
+    const gameCode = gameCodeInput.value;
+    socket.emit("startGame", { gameCode });
+  });
+}
 
-oceanGrid.addEventListener('click', function (e) {
-  const square = e.target;
-  socket.emit("attack", square.id);
-});
+if (oceanGrid) {
+  oceanGrid.addEventListener('click', e => {
+    if (e.target.id) socket.emit("attack", e.target.id);
+  });
+}
 
+// Modal
 const infoModal = document.getElementById('infoModal');
 const openModalBtns = document.getElementsByClassName('openModal');
 const closeModalBtn = document.getElementsByClassName('close')[0];
 
-Array.from(openModalBtns).forEach(btn => {
-  const modal = document.getElementById(`${btn.dataset.modal}Modal`);
-  btn.addEventListener('click', () => {
-    modal.style.display = 'block';
+if (openModalBtns) {
+  Array.from(openModalBtns).forEach(btn => {
+    const modal = document.getElementById(`${btn.dataset.modal}Modal`);
+    if (modal) {
+      btn.addEventListener('click', () => modal.style.display = 'block');
+    }
   });
-});
+}
 
-closeModalBtn.addEventListener('click', (e) => {
-  if (e.target.dataset.modal = "info")
-    infoModal.style.display = 'none';
-});
+if (closeModalBtn) {
+  closeModalBtn.addEventListener('click', e => {
+    if (e.target.dataset.modal === "info") infoModal.style.display = 'none';
+  });
+}
 
-// --
-
-const screenWidth = window.screen.width;
-const screenHeight = window.screen.height;
-if (screenWidth < 1440 && screenHeight < 900) {
+// --- Alert resolução mínima
+if (window.screen.width < 1440 && window.screen.height < 900) {
   alert('A minimum resolution of 1440x900 is recommended.');
 }

@@ -1,22 +1,21 @@
 /**
- * BattleshipGame API
+ * BattleshipGame API com Redis
  * 
- * Description: This script implements the backend API for a Battleship game using Socket.IO for real-time communication.
- * It allows players to start a game, make attacks, and handle hits.
+ * Description:
+ * Backend do jogo Batalha Naval com Socket.IO e Redis para gerenciar conexões,
+ * salas, sessões e turnos. Escalável e pronto para multi-instância.
  * 
  * Author: Allan Barcelos
- * Date: 2024-05-13
- * Version: 1.0
+ * Updated: 2025-11-09
+ * Version: 2.0
  */
 
-const dotenv = require('dotenv');
-const path = require('path');
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
-const socketio = require("socket.io");
-
-dotenv.config({ path: path.join(__dirname, '.env') });
+const { createClient } = require("redis");
+const { Server } = require("socket.io");
+const { createAdapter } = require("@socket.io/redis-adapter");
 
 const app = express();
 app.disable('x-powered-by');
@@ -24,82 +23,127 @@ app.use(cors({ origin: "*" }));
 app.use(express.json());
 
 const server = http.createServer(app);
-const io = socketio(server, { cors: { origin: "*" } });
-let rooms = {};
-let sockets = {};
+const io = new Server(server, { cors: { origin: "*" } });
 
-// Rotas
+/* Redis Setup */
+const redisHost = process.env.REDIS_HOST || "localhost";
+const redisPort = process.env.REDIS_PORT || 6379;
+
+const pubClient = createClient({ url: `redis://${redisHost}:${redisPort}` });
+const subClient = pubClient.duplicate();
+
+Promise.all([pubClient.connect(), subClient.connect()])
+  .then(() => console.log("Redis conectado com sucesso"))
+  .catch(console.error);
+
+// Conectar o Redis como adaptador do Socket.IO
+io.adapter(createAdapter(pubClient, subClient));
+
+/* Rotas HTTP */
 app.get("/", async (req, res) => {
-    res.json({ message: "BattleshipGame API" });
+  res.json({ message: "BattleshipGame API with Redis" });
 });
 
-// Socket.io
-io.on('connection', (socket) => {
-    sockets[socket.id] = socket;
+/* Lógica do Jogo */
+io.on("connection", (socket) => {
+  console.log(`Novo jogador conectado: ${socket.id}`);
 
-    socket.on("startGame", (res) => {
-        const gameCode = res?.gameCode ? res.gameCode : makeid(10);
+  socket.on("startGame", async (res) => {
+    const gameCode = res?.gameCode || makeid(10);
+    const roomKey = `room:${gameCode}`;
 
-        if (rooms[gameCode] && rooms[gameCode].length > 2) {
-            socket.emit('roomFull', true);
-            return 0;
-        }
+    let room = await pubClient.lRange(roomKey, 0, -1);
 
-        if (!rooms[gameCode])
-            rooms[gameCode] = [socket.id];
-        else
-            rooms[gameCode].push(socket.id);
+    if (room.length >= 2) {
+      socket.emit("roomFull", true);
+      return;
+    }
 
-        socket.join(gameCode);
+    await pubClient.rPush(roomKey, socket.id);
+    socket.join(gameCode);
 
-        if (rooms[gameCode].length === 1) {
-            socket.emit('startGame', { gameCode, msg: 'Send this code to your friend to start the game' });
-        } else {
-            const opponentId = rooms[gameCode].find(id => id !== socket.id);
-            sockets[opponentId].emit('startGame', { gameCode, msg: 'Your Turn' });
-            socket.emit('startGame', { gameCode, msg: 'The game start, wait for your turn ...' });
-        }
+    if (room.length === 0) {
+      socket.emit("startGame", {
+        gameCode,
+        msg: "Send this code to your friend to start the game",
+      });
+    } else {
+      const opponentId = room[0];
+      const turnKey = `turn:${gameCode}`;
+      await pubClient.set(turnKey, opponentId);
+
+      io.to(opponentId).emit("startGame", { gameCode, msg: "Your Turn" });
+      socket.emit("startGame", {
+        gameCode,
+        msg: "Game started, wait for your turn...",
+      });
+    }
+  });
+
+  socket.on("attack", async (res) => {
+    const gameCode = await findRoomBySocket(socket.id);
+    if (!gameCode) return;
+
+    const roomKey = `room:${gameCode}`;
+    const room = await pubClient.lRange(roomKey, 0, -1);
+    const opponentId = room.find((id) => id !== socket.id);
+
+    io.to(opponentId).emit("attack", res.replace("ocean", "squad"));
+
+    // alternar turno
+    const turnKey = `turn:${gameCode}`;
+    await pubClient.set(turnKey, opponentId);
+  });
+
+  socket.on("hit", async (res) => {
+    const gameCode = await findRoomBySocket(socket.id);
+    if (!gameCode) return;
+
+    const roomKey = `room:${gameCode}`;
+    const room = await pubClient.lRange(roomKey, 0, -1);
+    const opponentId = room.find((id) => id !== socket.id);
+
+    io.to(opponentId).emit("hit", {
+      hit: res.hit,
+      id: res.id.replace("squad", "ocean"),
     });
+  });
 
-    socket.on("attack", (res) => {
-        const room = findKeyByValue(socket.id);
-        const opponentId = rooms[room].find(id => id !== socket.id);
-        sockets[opponentId].emit('attack', res.replace("ocean", "squad"));
-    });
+  socket.on("disconnect", async () => {
+    console.log(`${socket.id} desconectado`);
+    const gameCode = await findRoomBySocket(socket.id);
+    if (!gameCode) return;
 
-    socket.on("hit", (res) => {
-        const room = findKeyByValue(socket.id);
-        const opponentId = rooms[room].find(id => id !== socket.id);
-        sockets[opponentId].emit('hit', { hit: res.hit, id: res.id.replace("squad", "ocean") });
-    });
+    const roomKey = `room:${gameCode}`;
+    await pubClient.lRem(roomKey, 0, socket.id);
 
-    socket.on("disconnect", () => {
-        console.log(`${socket.id} disconnected`);
-        delete sockets[socket.id];
-    });
+    io.to(gameCode).emit("playerLeft", { msg: "Opponent disconnected" });
+  });
 });
 
-// Iniciar servidor
-server.listen(3000, () => {
-    console.log(`Server listening on port 3000`);
-});
-
-// Funções auxiliares
+/* Funções Auxiliares */
 function makeid(length) {
-    let result = '';
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const charsLength = chars.length;
-    for (let i = 0; i < length; i++) {
-        result += chars.charAt(Math.floor(Math.random() * charsLength));
-    }
-    return result;
+  let result = "";
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
 }
 
-function findKeyByValue(value) {
-    for (let key in rooms) {
-        if (rooms[key].includes(value)) {
-            return key;
-        }
+async function findRoomBySocket(socketId) {
+  const keys = await pubClient.keys("room:*");
+  for (let key of keys) {
+    const members = await pubClient.lRange(key, 0, -1);
+    if (members.includes(socketId)) {
+      return key.split(":")[1];
     }
-    return null;
+  }
+  return null;
 }
+
+/* Iniciar Servidor */
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`BattleshipGame API running on port ${PORT}`);
+});

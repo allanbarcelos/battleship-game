@@ -76,7 +76,7 @@ jobs:
     needs: [discover-dockerfiles, set-environment]
     strategy:
       matrix:
-        service: ${{ needs.discover-dockerfiles.outputs.dockerfiles }}
+        service: ${{ fromJson(needs.discover-dockerfiles.outputs.dockerfiles) }}
     env:
       repository_name: ${{ needs.set-environment.outputs.repository_name }}
       gh_actor: ${{ needs.set-environment.outputs.gh_actor }}
@@ -138,12 +138,12 @@ jobs:
         run: |
           echo "Preparing deployment for services..."
 
-          DOCKERFILES=${{ needs.discover-dockerfiles.outputs.dockerfiles }}
-          REPO_NAME=${{ needs.set-environment.outputs.repository_name }}
-          HAS_ROOT=${{ needs.set-environment.outputs.has_root_dockerfile }}
-          MAIN_SERVICE=${{ needs.set-environment.outputs.main_service }}
+          DOCKERFILES='${{ needs.discover-dockerfiles.outputs.dockerfiles }}'
+          REPO_NAME='${{ needs.set-environment.outputs.repository_name }}'
+          HAS_ROOT='${{ needs.set-environment.outputs.has_root_dockerfile }}'
+          MAIN_SERVICE='${{ needs.set-environment.outputs.main_service }}'
 
-          # Mapear array JSON para objeto com nomes e flags
+          # Converter Dockerfiles para array e processar
           SERVICES_JSON=$(echo "$DOCKERFILES" | jq -c --arg repo "$REPO_NAME" --arg has_root "$HAS_ROOT" --arg main_service "$MAIN_SERVICE" '
             map(
               if . == "." then
@@ -281,23 +281,30 @@ jobs:
             echo "🔐 Logging in to GitHub Container Registry..."
             echo "$gh_token" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            # Parse services JSON
-            SERVICES=$(echo "$services_json" | jq -c '.[]')
+            # Parse services JSON corretamente
+            echo "Raw services_json: $services_json"
+            
+            # Verificar se o JSON é válido
+            if ! echo "$services_json" | jq empty 2>/dev/null; then
+              echo "❌ ERROR: Invalid JSON format"
+              exit 1
+            fi
 
-            # First, pull all images
+            # Processar cada serviço
+            SERVICE_COUNT=$(echo "$services_json" | jq length)
+            echo "Found $SERVICE_COUNT services to deploy"
+
+            # Primeiro, puxar todas as imagens
             echo "📦 Pulling all images..."
-            while IFS= read -r service; do
-              SERVICE_NAME=$(echo "$service" | jq -r '.name')
-              SERVICE_DIR=$(echo "$service" | jq -r '.dir')
-              IS_MAIN=$(echo "$service" | jq -r '.is_main')
+            for i in $(seq 0 $(($SERVICE_COUNT - 1))); do
+              SERVICE=$(echo "$services_json" | jq -c ".[$i]")
+              SERVICE_NAME=$(echo "$SERVICE" | jq -r '.name')
+              SERVICE_DIR=$(echo "$SERVICE" | jq -r '.dir')
+              IS_MAIN=$(echo "$SERVICE" | jq -r '.is_main')
 
-              # Fallbacks para evitar valores vazios
-              if [ -z "$SERVICE_NAME" ]; then
-                echo "❌ ERROR: Service name is empty, skipping..."
-                continue
-              fi
+              echo "Processing service: $SERVICE_NAME (dir: $SERVICE_DIR, main: $IS_MAIN)"
 
-              if [ "$SERVICE_DIR" = "." ] || [ -z "$SERVICE_DIR" ]; then
+              if [ "$SERVICE_DIR" = "." ]; then
                 IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
               else
                 IMAGE_NAME="ghcr.io/${{ github.repository }}-$SERVICE_DIR:latest"
@@ -305,9 +312,9 @@ jobs:
 
               echo "Pulling image: $IMAGE_NAME"
               docker pull "$IMAGE_NAME" || echo "⚠️ Failed to pull $IMAGE_NAME, continuing..."
-            done <<< "$SERVICES"
+            done
 
-            # Stop and remove old containers
+            # Parar e remover containers antigos
             echo "🛑 Stopping old containers..."
             OLD_CONTAINERS=$(docker ps -a --filter "name=$repository_name" --format "{{.Names}}")
             for container in $OLD_CONTAINERS; do
@@ -316,20 +323,15 @@ jobs:
               docker rm "$container" 2>/dev/null || true
             done
 
-            # Start all new containers
+            # Iniciar todos os novos containers
             echo "🚀 Starting all containers..."
-            while IFS= read -r service; do
-              SERVICE_NAME=$(echo "$service" | jq -r '.name')
-              SERVICE_DIR=$(echo "$service" | jq -r '.dir')
-              IS_MAIN=$(echo "$service" | jq -r '.is_main')
+            for i in $(seq 0 $(($SERVICE_COUNT - 1))); do
+              SERVICE=$(echo "$services_json" | jq -c ".[$i]")
+              SERVICE_NAME=$(echo "$SERVICE" | jq -r '.name')
+              SERVICE_DIR=$(echo "$SERVICE" | jq -r '.dir')
+              IS_MAIN=$(echo "$SERVICE" | jq -r '.is_main')
 
-              # Skip if service name is empty
-              if [ -z "$SERVICE_NAME" ]; then
-                echo "❌ ERROR: Service name is empty, skipping..."
-                continue
-              fi
-
-              if [ "$SERVICE_DIR" = "." ] || [ -z "$SERVICE_DIR" ]; then
+              if [ "$SERVICE_DIR" = "." ]; then
                 IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
               else
                 IMAGE_NAME="ghcr.io/${{ github.repository }}-$SERVICE_DIR:latest"
@@ -337,59 +339,53 @@ jobs:
 
               echo "Starting container: $SERVICE_NAME from $IMAGE_NAME"
 
-              # Base docker run command
+              # Comando base docker run
               RUN_CMD="docker run -d --name \"$SERVICE_NAME\" --restart unless-stopped"
 
-              # Attach to repository network (always)
-              if [ -n "$repo_network" ]; then
-                RUN_CMD="$RUN_CMD --network \"$repo_network\""
-              else
-                echo "⚠️ repo_network is empty, skipping network assignment"
-              fi
+              # Conectar à rede do repositório (sempre)
+              RUN_CMD="$RUN_CMD --network \"$repo_network\""
 
-              # Attach to main network if this is main service
-              if [ "$IS_MAIN" = "true" ] && [ -n "$main_network" ]; then
+              # Conectar à rede principal se for serviço principal
+              if [ "$IS_MAIN" = "true" ]; then
                 RUN_CMD="$RUN_CMD --network \"$main_network\""
-                # Volume mapping only for main service
+                # Mapeamento de volume apenas para serviço principal
                 RUN_CMD="$RUN_CMD -v /home/$ssh_usr/$SERVICE_NAME/logs/nginx:/var/log/nginx"
               fi
 
-              # Add image
+              # Adicionar imagem
               RUN_CMD="$RUN_CMD \"$IMAGE_NAME\""
 
               echo "Running: $RUN_CMD"
-              eval "$RUN_CMD"
-            done <<< "$SERVICES"
+              eval "$RUN_CMD" || echo "❌ Failed to start container $SERVICE_NAME"
+            done
 
             echo "⏳ Waiting for containers to start..."
             sleep 10
 
-            # Verify all containers are running
+            # Verificar se todos os containers estão rodando
             ALL_RUNNING=true
-            while IFS= read -r service; do
-              SERVICE_NAME=$(echo "$service" | jq -r '.name')
-              if [ -z "$SERVICE_NAME" ]; then
-                continue
-              fi
-
+            for i in $(seq 0 $(($SERVICE_COUNT - 1))); do
+              SERVICE=$(echo "$services_json" | jq -c ".[$i]")
+              SERVICE_NAME=$(echo "$SERVICE" | jq -r '.name')
+              
               if docker inspect -f '{{.State.Running}}' "$SERVICE_NAME" 2>/dev/null | grep -q true; then
                 echo "✅ Container $SERVICE_NAME started successfully."
               else
                 echo "❌ Container $SERVICE_NAME failed to start."
                 ALL_RUNNING=false
               fi
-            done <<< "$SERVICES"
+            done
 
             if [ "$ALL_RUNNING" = true ]; then
               echo "✅ All containers started successfully."
-              # Restart nginx if main service exists
-              MAIN_SERVICE_EXISTS=$(echo "$services_json" | jq 'map(select(.is_main == "true")) | length')
+              # Reiniciar nginx se serviço principal existe
+              MAIN_SERVICE_EXISTS=$(echo "$services_json" | jq '[.[] | select(.is_main == "true")] | length')
               if [ "$MAIN_SERVICE_EXISTS" -gt 0 ]; then
                 sudo systemctl restart nginx
                 echo "✅ Nginx restarted."
               fi
             else
-              echo "❌ Deployment failed — initiating rollback."
+              echo "❌ Deployment failed — some containers did not start."
               exit 1
             fi
 

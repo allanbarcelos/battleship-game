@@ -138,15 +138,13 @@ jobs:
         run: |
           echo "Preparing deployment for services..."
 
-          # Pega os outputs corretamente como JSON
-          DOCKERFILES='${{ needs.discover-dockerfiles.outputs.dockerfiles }}'
-          REPO_NAME='${{ needs.set-environment.outputs.repository_name }}'
-          HAS_ROOT='${{ needs.set-environment.outputs.has_root_dockerfile }}'
-          MAIN_SERVICE='${{ needs.set-environment.outputs.main_service }}'
+          DOCKERFILES=${{ needs.discover-dockerfiles.outputs.dockerfiles }}
+          REPO_NAME=${{ needs.set-environment.outputs.repository_name }}
+          HAS_ROOT=${{ needs.set-environment.outputs.has_root_dockerfile }}
+          MAIN_SERVICE=${{ needs.set-environment.outputs.main_service }}
 
-          # Transformar string JSON em objeto JSON real
+          # Mapear array JSON para objeto com nomes e flags
           SERVICES_JSON=$(echo "$DOCKERFILES" | jq -c --arg repo "$REPO_NAME" --arg has_root "$HAS_ROOT" --arg main_service "$MAIN_SERVICE" '
-            fromjson |
             map(
               if . == "." then
                 {
@@ -164,10 +162,8 @@ jobs:
             )
           ')
 
-          # Exportar para output do GitHub Actions
           echo "services_json=$SERVICES_JSON" >> $GITHUB_OUTPUT
           echo "Services to deploy: $SERVICES_JSON"
-
 
       - name: Ensure Docker networks exist
         uses: appleboy/ssh-action@v0.1.9

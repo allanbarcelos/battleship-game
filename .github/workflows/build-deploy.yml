@@ -99,7 +99,7 @@ jobs:
       - name: Determine image name
         id: image-name
         run: |
-          if [ "${{ matrix.service }}" = "Dockerfile" ]; then
+          if [ "${{ matrix.service }}" = "." ]; then
             IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
             echo "service_name=${{ needs.set-environment.outputs.repository_name }}" >> $GITHUB_OUTPUT
           else

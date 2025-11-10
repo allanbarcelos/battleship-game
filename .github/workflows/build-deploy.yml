@@ -194,50 +194,6 @@ jobs:
               echo "✅ Network '$repo_network' created successfully."
             fi
 
-
-      # - name: Clean up old container structure
-      #   uses: appleboy/ssh-action@v0.1.9
-      #   with:
-      #     host: ${{ secrets.SSH_HST }}
-      #     username: ${{ secrets.SSH_USR }}
-      #     key: ${{ secrets.SSH_KEY }}
-      #     port: ${{ secrets.SSH_PRT }}
-      #     envs: repository_name
-      #     script: |
-      #       echo "🧹 Cleaning up old container structure..."
-            
-      #       # Find and remove old containers (using old naming pattern)
-      #       OLD_CONTAINERS=$(docker ps -a --filter "name=$repository_name" --format "{{.Names}}" | grep -E "^$repository_name(-[a-zA-Z0-9_-]+)?$")
-            
-      #       if [ -n "$OLD_CONTAINERS" ]; then
-      #         echo "Found old containers to remove:"
-      #         echo "$OLD_CONTAINERS"
-              
-      #         for container in $OLD_CONTAINERS; do
-      #           echo "Stopping and removing container: $container"
-      #           docker stop "$container" 2>/dev/null || true
-      #           docker rm "$container" 2>/dev/null || true
-      #           echo "✅ Container $container removed"
-      #         done
-      #       else
-      #         echo "No old containers found with pattern: $repository_name"
-      #       fi
-            
-      #       # Clean up old images (dangling and unused)
-      #       echo "Cleaning up old images..."
-      #       OLD_IMAGES=$(docker images --filter "dangling=true" -q)
-      #       if [ -n "$OLD_IMAGES" ]; then
-      #         echo "Removing dangling images..."
-      #         docker rmi $OLD_IMAGES 2>/dev/null || true
-      #       fi
-            
-      #       # Remove unused images (more aggressive cleanup)
-      #       echo "Removing unused images..."
-      #       docker image prune -a -f 2>/dev/null || true
-            
-      #       echo "✅ Old container structure cleanup completed"
-
-
       - name: Save previous images for rollback
         uses: appleboy/ssh-action@v0.1.9
         with:

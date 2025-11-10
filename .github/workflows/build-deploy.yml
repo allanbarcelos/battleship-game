@@ -46,9 +46,13 @@ jobs:
             fi
           fi
           
+          # echo "Found Dockerfiles: $DOCKERFILES_JSON"
+          # echo "Has root Dockerfile: ${{ steps.find-dockerfiles.outputs.has_root_dockerfile }}"
+          # echo "Main service: ${{ steps.find-dockerfiles.outputs.main_service }}"
+
           echo "Found Dockerfiles: $DOCKERFILES_JSON"
-          echo "Has root Dockerfile: ${{ steps.find-dockerfiles.outputs.has_root_dockerfile }}"
-          echo "Main service: ${{ steps.find-dockerfiles.outputs.main_service }}"
+          echo "Has root Dockerfile: $HAS_ROOT"
+          echo "Main service: $MAIN_SERVICE"
 
   set-environment:
     runs-on: ubuntu-latest
@@ -95,7 +99,7 @@ jobs:
       - name: Determine image name
         id: image-name
         run: |
-          if [ "${{ matrix.service }}" = "." ]; then
+          if [ "${{ matrix.service }}" = "Dockerfile" ]; then
             IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
             echo "service_name=${{ needs.set-environment.outputs.repository_name }}" >> $GITHUB_OUTPUT
           else

@@ -4,7 +4,7 @@
  * Description: Multiplayer Battleship game with Socket.IO
  */
 
-const host = window.location.origin;
+const host =window.location.origin + window.location.pathname;
 const apiBase = `${host}/api`;
 // Remover o socketPath ou ajustar conforme necessário
 // const socketPath = '/socket.io';

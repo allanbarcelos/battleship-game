@@ -112,7 +112,6 @@ placePlayerShips();
 
 // --- Socket.IO - Configuração Corrigida
 const socket = io(host, {
-  path: 'socket.io',
   transports: ['websocket', 'polling'], // Forçar ambos os transportes
   withCredentials: false
 });

@@ -17,4 +17,7 @@ USER battleship
 
 EXPOSE 3000 6379
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD nc -z localhost 6379 && nc -z localhost 3000 || exit 1
+  
 CMD redis-server --daemonize yes && pm2-runtime start ecosystem.config.js

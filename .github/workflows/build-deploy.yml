@@ -22,8 +22,10 @@ jobs:
           SERVICES=$(find . -name Dockerfile -type f | sed 's|/Dockerfile||' | sed 's|^\./||' | grep -v '^$' | sort)
           
           # Always prefer 'web' as main service if it exists
-          MAIN_SERVICE="api"
-          if echo "$SERVICES" | grep -q "^web$"; then
+          MAIN_SERVICE=""
+          if echo "$SERVICES" | grep -q "^.$"; then
+            MAIN_SERVICE="."
+          elif echo "$SERVICES" | grep -q "^web$"; then
             MAIN_SERVICE="web"
           elif echo "$SERVICES" | grep -q "^api$"; then
             MAIN_SERVICE="api"

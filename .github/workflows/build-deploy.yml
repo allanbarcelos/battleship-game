@@ -183,8 +183,14 @@ jobs:
 
             echo "Starting new containers..."
             for service in "${SERVICES[@]}"; do
-              IMAGE="ghcr.io/${{ github.repository }}/$REPO_NAME-$service:latest"
-              CONTAINER_NAME="$REPO_NAME-$service"
+
+              if [ $service = "." ]; then
+                IMAGE="ghcr.io/${{ github.repository }}/$REPO_NAME:latest"
+                CONTAINER_NAME="$REPO_NAME"
+              else
+                IMAGE="ghcr.io/${{ github.repository }}/$REPO_NAME-$service:latest"
+                CONTAINER_NAME="$REPO_NAME-$service"
+              fi
 
               echo "Pulling $IMAGE"
               docker pull "$IMAGE"
@@ -217,12 +223,24 @@ jobs:
             # Final check
             FAILED=false
             for service in "${SERVICES[@]}"; do
-              if ! docker ps --filter "name=$REPO_NAME-$service" --filter "status=running" --format "{{.Names}}" | grep -q .; then
-                echo "$REPO_NAME-$service failed to start"
-                FAILED=true
+
+
+              if [ $service = "." ]; then
+                if ! docker ps --filter "name=$REPO_NAME" --filter "status=running" --format "{{.Names}}" | grep -q .; then
+                  echo "$REPO_NAME failed to start"
+                  FAILED=true
+                else
+                  echo "$REPO_NAME is running"
+                fi
               else
-                echo "$REPO_NAME-$service is running"
+                if ! docker ps --filter "name=$REPO_NAME-$service" --filter "status=running" --format "{{.Names}}" | grep -q .; then
+                  echo "$REPO_NAME-$service failed to start"
+                  FAILED=true
+                else
+                  echo "$REPO_NAME-$service is running"
+                fi
               fi
+
             done
 
             if [ "$FAILED" = "true" ]; then

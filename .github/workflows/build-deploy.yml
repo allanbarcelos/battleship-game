@@ -111,6 +111,7 @@ jobs:
           username: ${{ secrets.SSH_USR }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PRT }}
+          envs: REPO_NETWORK
           script: |
             if ! docker network ls --format "{{.Name}}" | grep -q "^barcelos\.dev$"; then
               echo "Creating network: barcelos.dev"

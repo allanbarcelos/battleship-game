@@ -81,9 +81,9 @@ jobs:
         run: |
           SERVICE="${{ matrix.service }}"
           if [ "$SERVICE" = "." ]; then
-            IMAGE_NAME="ghcr.io/${{ github.repository }}/$REPO_NAME:latest"
+            IMAGE_NAME="ghcr.io/${{ github.repository }}:latest"
           else
-            IMAGE_NAME="ghcr.io/${{ github.repository }}/$REPO_NAME-${SERVICE}:latest"
+            IMAGE_NAME="ghcr.io/${{ github.repository }}-${SERVICE}:latest"
           fi
 
           echo "Building $SERVICE → $IMAGE_NAME"
@@ -185,10 +185,10 @@ jobs:
             for service in "${SERVICES[@]}"; do
 
               if [ $service = "." ]; then
-                IMAGE="ghcr.io/${{ github.repository }}/$REPO_NAME:latest"
+                IMAGE="ghcr.io/${{ github.repository }}:latest"
                 CONTAINER_NAME="$REPO_NAME"
               else
-                IMAGE="ghcr.io/${{ github.repository }}/$REPO_NAME-$service:latest"
+                IMAGE="ghcr.io/${{ github.repository }}-$service:latest"
                 CONTAINER_NAME="$REPO_NAME-$service"
               fi
 

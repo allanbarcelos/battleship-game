@@ -193,8 +193,8 @@ if (openModalBtns) {
 }
 
 if (closeModalBtn) {
-  closeModalBtn.addEventListener('click', e => {
-    if (e.target.dataset.modal === "info") infoModal.style.display = 'none';
+  closeModalBtn.addEventListener('click', () => {
+   infoModal.style.display = 'none';
   });
 }
 

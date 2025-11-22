@@ -161,8 +161,25 @@ jobs:
             SERVICES=($(echo "$SERVICES_JSON" | jq -r '.[]'))
 
             echo "Stopping old containers..."
-            docker ps -a --filter "name=${REPO_NAME}" --format "{{.Names}}" | xargs -r docker stop
-            docker ps -a --filter "name=${REPO_NAME}" --format "{{.Names}}" | xargs -r docker rm
+            
+            echo "Stopping only relevant containers..."
+            for service in "${SERVICES[@]}"; do
+              if [ $service = "." ]; then
+                NAME="${REPO_NAME}"
+              else
+                NAME="${REPO_NAME}-${service}"
+              fi
+              
+              echo "Checking $NAME..."
+
+              if docker ps -a --format "{{.Names}}" | grep -q "^${NAME}$"; then
+                echo "Stopping $NAME"
+                docker stop "$NAME" || true
+                docker rm "$NAME" || true
+              else
+                echo "$NAME not running."
+              fi
+            done
 
             echo "Starting new containers..."
             for service in "${SERVICES[@]}"; do

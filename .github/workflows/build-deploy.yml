@@ -186,7 +186,6 @@ jobs:
               if [ "$service" = "$MAIN_SERVICE" ]; then
                 CMD="$CMD --network barcelos.dev"
                 CMD="$CMD --network-alias $REPO_NAME"
-                CMD="$CMD -p 80:80"  # Adjust if you use different host port
                 CMD="$CMD -v /home/${{ secrets.SSH_USR }}/$REPO_NAME/logs/nginx:/var/log/nginx"
               fi
 

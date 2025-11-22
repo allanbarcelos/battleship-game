@@ -109,12 +109,13 @@ placePlayerShips();
 
 // --- Socket.IO - Configuração Corrigida
 
-const { origin, pathname } = window.location;
-const fullPath = `${origin}${pathname}`;
-console.log(fullPath);
+const pathParts = window.location.pathname.split('/');
+pathParts.pop();
+const basePath = pathParts.join('/');
 
-const socket = io(fullPath, {
-  transports: ['websocket', 'polling'], // Forçar ambos os transportes
+const socket = io(window.location.origin, {
+  path: `${basePath}/socket.io`,
+  transports: ['websocket', 'polling'],
   withCredentials: false
 });
 

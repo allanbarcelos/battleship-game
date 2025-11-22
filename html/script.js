@@ -4,10 +4,6 @@
  * Description: Multiplayer Battleship game with Socket.IO
  */
 
-const host =window.location.origin + window.location.pathname;
-const apiBase = `${host}/api`;
-// Remover o socketPath ou ajustar conforme necessário
-// const socketPath = '/socket.io';
 
 let grids = document.getElementsByClassName('grid');
 let squadGrid = document.getElementById('squad-grid');
@@ -110,8 +106,14 @@ function sounds(res) {
 createGrid();
 placePlayerShips();
 
+
 // --- Socket.IO - Configuração Corrigida
-const socket = io(host, {
+
+const { origin, pathname } = window.location;
+const fullPath = `${origin}${pathname}`;
+console.log(fullPath);
+
+const socket = io(fullPath, {
   transports: ['websocket', 'polling'], // Forçar ambos os transportes
   withCredentials: false
 });

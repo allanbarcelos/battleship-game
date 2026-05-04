@@ -1,3 +1,19 @@
+/* ── CSS Custom Properties ─────────────────────────────────── */
+:root {
+  --grid-columns: 26;
+  --cell-size: 20px;
+  --cell-gap: 1px;
+  --grid-width: 598px;       /* (26 * 20) + (27 * 1) + 2px border */
+  --header-width: 598px;
+  --header-height: 150px;
+  --modal-max-width: 400px;
+  --color-sea: rgb(213, 243, 253);
+  --color-border: #333;
+  --color-modal-bg: rgba(0, 0, 0, 0.5);
+  --color-close-btn: #aaa;
+}
+
+/* ── Layout ────────────────────────────────────────────────── */
 .container {
   margin-top: 10px;
   width: 100vw;
@@ -6,12 +22,10 @@
   gap: 10px;
 }
 
+/* ── Header ────────────────────────────────────────────────── */
 .header {
-  width: 598px;
-  height: 150px;
-  /* background-color: aquamarine; */
-  /* border: 1px solid #333; */
-
+  width: var(--header-width);
+  height: var(--header-height);
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   grid-template-rows: repeat(3, 1fr);
@@ -53,7 +67,6 @@
   padding: 0;
   margin: 0;
   text-align: center;
-
 }
 
 .header #player1 {
@@ -76,13 +89,15 @@
   text-transform: capitalize;
 }
 
+/* ── Grid ──────────────────────────────────────────────────── */
 .grid {
-  padding: 1px;
+  position: relative;
+  padding: var(--cell-gap);
   display: grid;
-  grid-template-columns: repeat(26, 1fr);
-  grid-gap: 1px;
-  border: 1px solid #333;
-  width: 598px;
+  grid-template-columns: repeat(var(--grid-columns), 1fr);
+  grid-gap: var(--cell-gap);
+  border: 1px solid var(--color-border);
+  width: var(--grid-width);
 }
 
 #ocean-grid {
@@ -90,96 +105,74 @@
 }
 
 .grid div {
-  background-color: rgb(213, 243, 253);
-  border: 1px solid #333;
-  height: 20px;
-  width: 20px;
+  background-color: var(--color-sea);
+  border: 1px solid var(--color-border);
+  height: var(--cell-size);
+  width: var(--cell-size);
 }
 
+/* ── Estados de célula ─────────────────────────────────────── */
 .explosion {
   z-index: 999;
   background-image: url('assets/explosion.png');
-  /* caminho para a imagem */
 }
 
 .water {
   z-index: 999;
   background-image: url('assets/water.png');
-  /* caminho para a imagem */
 }
 
+/* ── Botões ────────────────────────────────────────────────── */
 button {
   margin-top: 10px;
   padding: 5px 10px;
   font-size: 16px;
 }
 
-.occupied {
-  /* background-color: #333 !important; */
-}
-
-/*  */
+/* ── Sprites horizontais ───────────────────────────────────── */
+/* Posições são coordenadas fixas de spritesheet e não usam variáveis */
 .sprite-h {
   background-image: url('assets/battleships-h.png');
-  /* caminho para a imagem */
-  /* background-color: aqua;
-  opacity: 0.5; */
-
 }
 
 .sprite-h.cruzader-h {
   background-position: -32px 3px;
-  /* posição do primeiro sprite */
 }
 
 .sprite-h.aircraft-h {
   background-position: -8px -47px;
-  /* posição do segundo sprite */
 }
 
 .sprite-h.frigate-h {
   background-position: -28px -114px;
-  /* posição do segundo sprite */
 }
 
 .sprite-h.submarine-h {
   background-position: -175px -74px;
-  /* posição do segundo sprite */
 }
 
-/*  */
+/* ── Sprites verticais ─────────────────────────────────────── */
 .sprite-v {
   background-image: url('assets/battleships-v.png');
-  /* caminho para a imagem */
-  /* background-color: aqua;
-  opacity: 0.5; */
-
 }
 
 .sprite-v.cruzader-v {
   background-position: 4px 190px;
-  /* posição do primeiro sprite */
 }
 
 .sprite-v.aircraft-v {
   background-position: -48px 170px;
-  /* posição do segundo sprite */
 }
 
 .sprite-v.frigate-v {
   background-position: -113px 189px;
-  /* posição do segundo sprite */
 }
-
 
 .sprite-v.submarine-v {
   background-position: -74px 310px;
-  /* posição do segundo sprite */
 }
 
-
-/*  */
-
+/* ── Modal ─────────────────────────────────────────────────── */
 .modal {
   display: none;
   position: fixed;
@@ -188,7 +181,7 @@ button {
   top: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--color-modal-bg);
 }
 
 .modal-content {
@@ -197,12 +190,12 @@ button {
   padding: 20px;
   border: 1px solid #888;
   width: 80%;
-  max-width: 400px;
+  max-width: var(--modal-max-width);
   text-align: center;
 }
 
 .close {
-  color: #aaa;
+  color: var(--color-close-btn);
   float: right;
   font-size: 28px;
   font-weight: bold;

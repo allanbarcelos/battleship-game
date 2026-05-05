@@ -69,22 +69,14 @@
   text-align: center;
 }
 
-.header #player1 {
-  grid-area: 3 / 1 / 4 / 3;
+.header #board-label {
+  grid-area: 3 / 2 / 4 / 6;
   display: flex;
-  justify-content: start;
+  justify-content: center;
   align-items: end;
 }
 
-.header #player2 {
-  grid-area: 3 / 5 / 4 / 7;
-  display: flex;
-  justify-content: end;
-  align-items: end;
-}
-
-.header #player1,
-#player2 span {
+.header #board-label span {
   font-size: 1.6em;
   text-transform: capitalize;
 }
@@ -98,6 +90,16 @@
   grid-gap: var(--cell-gap);
   border: 1px solid var(--color-border);
   width: var(--grid-width);
+  animation: board-in 0.25s ease;
+}
+
+.board-hidden {
+  display: none;
+}
+
+@keyframes board-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 #ocean-grid {

@@ -1,0 +1,51 @@
+Com base na análise completa do código, aqui está o que pode ser melhorado, ordenado por impacto:                                                             
+                                                                                                                                                                
+  ---                                                                                                                                                           
+  Gameplay / UX                                                                                                                                                 
+                                                                                                                                                                
+  1. Rematch sem reload — ao fim do jogo não há botão "Play Again"; o usuário precisa recarregar a página para jogar de novo                                    
+  2. Posicionamento manual de navios — hoje é 100% aleatório; o jogador não tem controle sobre onde colocar os navios                                         
+  3. Timer de turno — nenhum limite de tempo por jogada; um jogador pode deixar o navegador aberto e o outro espera indefinidamente
+  4. Chat entre jogadores — sem nenhum canal de comunicação além do jogo em si
+  5. Contador de navios restantes — não há indicação de quantos navios ou células ainda restam ao oponente
+
+  Reconexão / Estado
+
+  6. Persistência de estado — se qualquer jogador recarregar a página, o estado do jogo é perdido; um sessionStorage básico resolveria para casos de reload
+  acidental
+  7. Sincronização do tabuleiro no resync — a reconexão atual só sincroniza myTurn; se os grids divergirem por algum bug, não há reconciliação visual
+
+  Segurança / Confiabilidade
+
+  8. Signaling público sem autenticação — qualquer um que adivinhe ou force o código de 10 chars pode interceptar o SDP offer/answer no ntfy.sh
+  9. STUN/TURN gratuitos — usa Google STUN e OpenRelay sem SLA; em produção isso é um ponto de falha externo sem fallback
+  10. Look-back de 10 minutos do guest — se o host postou o offer há mais de 10 minutos, o guest nunca o encontra e a sessão trava silenciosamente
+
+  Código / Arquitetura
+
+  11. Tudo em um arquivo de 500 linhas — script.js mistura grid, navios, P2P, signaling, protocolo e UI; dificulta manutenção
+  12. Zero testes — nenhum framework de teste; lógica de jogo (hit detection, turn state) poderia ser testada unitariamente
+  13. Sem build/minificação — arquivos CSS e JS servidos sem compressão ou bundling; sem source maps
+  14. startGame pode ser clicado múltiplas vezes — clicar o botão várias vezes cria múltiplos peers sem limpar o anterior
+
+  Mobile / Acessibilidade
+
+  15. Sem suporte mobile — exige 1440×900 mínimo; nenhum layout responsivo
+  16. Sem ARIA — as 676 células do grid não têm labels acessíveis; inutilizável com leitor de tela
+  17. Sem navegação por teclado — ataque só funciona com clique do mouse
+
+  Infra / Deploy
+
+  18. Sem health check real — o workflow espera 15s fixos após subir o container; sem verificação se o serviço está de fato respondendo
+  19. Sem versionamento de assets — CSS e JS sem hash no nome; cache do browser pode servir versão antiga após deploy
+
+  ---
+  Qual dessas quer atacar primeiro?
+
+✻ Cogitated for 30s               
+                                                                                          
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯                                                                                                                                                               
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ accept edits on (shift+tab to cycle)                                                                                                       ⧉ In script.js  
+                                                                                                                                                                

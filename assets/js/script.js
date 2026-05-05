@@ -49,6 +49,13 @@
   const iceCandidateQueue = [];
   let signalingChain = Promise.resolve();
 
+  /* ── Reconnection state ──────────────────────────────────────── */
+  let hasGameStarted = false;
+  let isReconnecting = false;
+  let reconnectAttempts = 0;
+  const MAX_RECONNECT = 5;
+  let reconnectTimer = null;
+
   /* ────────────────────────────────────────────────────────────── */
   /* Grid                                                           */
   /* ────────────────────────────────────────────────────────────── */
@@ -133,7 +140,11 @@
   /* ────────────────────────────────────────────────────────────── */
   function setMyTurn(value) {
     myTurn = value;
-    if (oceanGrid) oceanGrid.style.cursor = myTurn ? 'pointer' : 'not-allowed';
+    oceanGrid.style.cursor = myTurn ? 'pointer' : 'not-allowed';
+    squadGrid.classList.toggle('board-hidden', myTurn);
+    oceanGrid.classList.toggle('board-hidden', !myTurn);
+    const labelSpan = document.querySelector('#board-label span');
+    if (labelSpan) labelSpan.textContent = myTurn ? 'Ocean' : 'Your Squad';
   }
 
   function playSound(hit) {
@@ -295,9 +306,9 @@
     };
 
     peer.onconnectionstatechange = () => {
-      if (peer.connectionState === 'failed' && !gameEnded) {
-        setMyTurn(false);
-        updateHeader('', 'Connection failed. Reload to try again.');
+      const state = peer.connectionState;
+      if ((state === 'failed' || state === 'disconnected') && !gameEnded) {
+        scheduleReconnect();
       }
     };
 
@@ -310,13 +321,13 @@
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
       await postSignal({ type: 'offer', from: 'host', sdp: offer.sdp });
-      updateHeader(code, 'Waiting for opponent...');
+      if (!isReconnecting) updateHeader(code, 'Waiting for opponent...');
     } else {
       peer.ondatachannel = ({ channel }) => {
         dataChannel = channel;
         setupDataChannel();
       };
-      updateHeader(code, 'Connecting...');
+      if (!isReconnecting) updateHeader(code, 'Connecting...');
     }
   }
 
@@ -328,11 +339,23 @@
       // Signaling is no longer needed once P2P is established
       if (signalingEs) { signalingEs.close(); signalingEs = null; }
 
-      if (myRole === 'host') {
-        setMyTurn(true);
-        updateHeader(gameCode, 'Your Turn');
-        // Tell guest the game started and it's not their turn yet
-        dataChannel.send(JSON.stringify({ type: 'start', yourTurn: false }));
+      isReconnecting = false;
+      reconnectAttempts = 0;
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+
+      if (!hasGameStarted) {
+        hasGameStarted = true;
+        if (myRole === 'host') {
+          setMyTurn(true);
+          updateHeader(gameCode, 'Your Turn');
+          dataChannel.send(JSON.stringify({ type: 'start', yourTurn: false }));
+        }
+      } else {
+        // Reconnected — host syncs whose turn it is
+        updateHeader(gameCode, myTurn ? 'Your Turn' : 'Wait for your turn...');
+        if (myRole === 'host') {
+          dataChannel.send(JSON.stringify({ type: 'resync', hostTurn: myTurn }));
+        }
       }
     };
 
@@ -341,11 +364,40 @@
     };
 
     dataChannel.onclose = () => {
-      if (!gameEnded) {
-        setMyTurn(false);
-        updateHeader('', 'Opponent disconnected.');
-      }
+      if (!gameEnded) scheduleReconnect();
     };
+  }
+
+  /* ────────────────────────────────────────────────────────────── */
+  /* Reconnection                                                   */
+  /* ────────────────────────────────────────────────────────────── */
+  function scheduleReconnect() {
+    if (gameEnded || reconnectTimer) return;
+    if (reconnectAttempts >= MAX_RECONNECT) {
+      setMyTurn(false);
+      updateHeader('', 'Could not reconnect. Reload to try again.');
+      return;
+    }
+
+    reconnectAttempts++;
+    const delay = Math.min(1000 * (1 << (reconnectAttempts - 1)), 16000); // 1s 2s 4s 8s 16s
+    setMyTurn(false);
+    updateHeader(gameCode, `Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT})`);
+
+    reconnectTimer = setTimeout(async () => {
+      reconnectTimer = null;
+      isReconnecting = true;
+
+      if (dataChannel) { try { dataChannel.close(); } catch (_) {} dataChannel = null; }
+      if (peer)        { try { peer.close(); }        catch (_) {} peer = null; }
+      if (signalingEs) { signalingEs.close(); signalingEs = null; }
+
+      remoteDescSet = false;
+      iceCandidateQueue.length = 0;
+      signalingChain = Promise.resolve();
+
+      await initP2P(myRole, gameCode);
+    }, delay);
   }
 
   /* ────────────────────────────────────────────────────────────── */
@@ -401,6 +453,12 @@
       case 'defeat':
         // Opponent declared they lost — we win
         showGameOver(true);
+        break;
+
+      case 'resync':
+        // Received after reconnect — host tells us whose turn it is
+        setMyTurn(!msg.hostTurn);
+        updateHeader(gameCode, myTurn ? 'Your Turn' : 'Wait for your turn...');
         break;
     }
   }

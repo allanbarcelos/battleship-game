@@ -363,6 +363,7 @@
       if (!hasGameStarted) {
         hasGameStarted = true;
         updateFleetCounters();
+        initChat();
         if (myRole === 'host') {
           setMyTurn(true);
           updateHeader(gameCode, 'Your Turn');
@@ -487,7 +488,44 @@
         updateHeader(gameCode, myTurn ? 'Your Turn' : 'Wait for your turn...');
         updateFleetCounters();
         break;
+
+      case 'chat':
+        appendChatMessage(msg.text, false);
+        break;
     }
+  }
+
+  /* ────────────────────────────────────────────────────────────── */
+  /* Chat                                                           */
+  /* ────────────────────────────────────────────────────────────── */
+  function appendChatMessage(text, mine) {
+    const messages = document.getElementById('chat-messages');
+    if (!messages) return;
+    const div = document.createElement('div');
+    div.className = `msg ${mine ? 'msg-me' : 'msg-opp'}`;
+    div.textContent = text;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function initChat() {
+    const panel   = document.getElementById('chat-panel');
+    const input   = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('chat-send');
+    panel.style.display = 'flex';
+
+    function send() {
+      const text = input.value.trim();
+      if (!text || !dataChannel || dataChannel.readyState !== 'open') return;
+      dataChannel.send(JSON.stringify({ type: 'chat', text }));
+      appendChatMessage(text, true);
+      input.value = '';
+    }
+
+    sendBtn.addEventListener('click', send);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); send(); }
+    });
   }
 
   /* ────────────────────────────────────────────────────────────── */

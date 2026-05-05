@@ -114,12 +114,12 @@
 /* ── Estados de célula ─────────────────────────────────────── */
 .explosion {
   z-index: 999;
-  background-image: url('assets/explosion.png');
+  background-image: url('../img/explosion.png');
 }
 
 .water {
   z-index: 999;
-  background-image: url('assets/water.png');
+  background-image: url('../img/water.png');
 }
 
 /* ── Botões ────────────────────────────────────────────────── */
@@ -132,7 +132,7 @@ button {
 /* ── Sprites horizontais ───────────────────────────────────── */
 /* Posições são coordenadas fixas de spritesheet e não usam variáveis */
 .sprite-h {
-  background-image: url('assets/battleships-h.png');
+  background-image: url('../img/battleships-h.png');
 }
 
 .sprite-h.cruzader-h {
@@ -153,7 +153,7 @@ button {
 
 /* ── Sprites verticais ─────────────────────────────────────── */
 .sprite-v {
-  background-image: url('assets/battleships-v.png');
+  background-image: url('../img/battleships-v.png');
 }
 
 .sprite-v.cruzader-v {

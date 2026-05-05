@@ -756,6 +756,8 @@
   /* ────────────────────────────────────────────────────────────── */
   function initUI() {
     startGameBtn.addEventListener('click', () => {
+      if (peer || hasGameStarted) return;
+      startGameBtn.disabled = true;
       clearSavedState();
       const inputCode = gameCodeInput.value.trim().toUpperCase();
       if (inputCode.length === 10) {

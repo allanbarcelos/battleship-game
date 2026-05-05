@@ -69,8 +69,37 @@
   text-align: center;
 }
 
+.header #fleet-me {
+  grid-area: 3 / 1 / 4 / 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  align-items: start;
+}
+
+.header #fleet-enemy {
+  grid-area: 3 / 5 / 4 / 7;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  align-items: end;
+}
+
+.header #fleet-me span,
+.header #fleet-enemy span {
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.header #fleet-me .fleet-count,
+.header #fleet-enemy .fleet-count {
+  font-size: 1.4em;
+  font-weight: bold;
+  line-height: 1;
+}
+
 .header #board-label {
-  grid-area: 3 / 2 / 4 / 6;
+  grid-area: 3 / 3 / 4 / 5;
   display: flex;
   justify-content: center;
   align-items: end;

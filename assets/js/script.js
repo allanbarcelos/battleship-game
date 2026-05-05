@@ -22,9 +22,11 @@
   const squaresSquad = [];
   const squaresOcean = [];
   let occupiedSquares = [];     // squad-N cells our ships occupy
+  const shipCells = [];         // per-ship cell groups: [[id,…], …]
   let myTurn = false;
   const attackedCells = new Set();    // ocean-N cells we've attacked
   const destroyedSquares = new Set(); // squad-N cells of ours that were hit
+  let opponentSunk = 0;               // count of enemy ships we've sunk
   let gameEnded = false;
 
   /* ── Audio ───────────────────────────────────────────────────── */
@@ -106,6 +108,7 @@
       } while (occupied);
 
       let k = 0, firstSquareTop, firstSquareLeft;
+      const thisCells = [];
       for (let j = y; j < y + h + 1; j++) {
         for (let i = x; i < x + w + 1; i++) {
           const s = document.querySelector(`div[data-x="${i}"][data-y="${j}"]`);
@@ -117,11 +120,13 @@
             if (frame[k] === '1') {
               occupiedSquares.push(s.id);
               s.classList.add('occupied');
+              thisCells.push(s.id);
             }
             k++;
           }
         }
       }
+      shipCells.push(thisCells);
 
       const shipDiv = document.createElement('span');
       shipDiv.style.width = `${w * CELL_PX}px`;
@@ -194,6 +199,18 @@
   function makeid(length) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  }
+
+  function updateFleetCounters() {
+    const myRemaining = shipCells.filter(cells => cells.some(id => !destroyedSquares.has(id))).length;
+    const enemyRemaining = ships.length - opponentSunk;
+    const meEl  = document.getElementById('fleet-me');
+    const eneEl = document.getElementById('fleet-enemy');
+    if (!meEl || !eneEl) return;
+    meEl.innerHTML  = `<span>Your Fleet</span><span class="fleet-count">${myRemaining} / ${ships.length}</span>`;
+    eneEl.innerHTML = `<span>Enemy Fleet</span><span class="fleet-count">${enemyRemaining} / ${ships.length}</span>`;
+    meEl.style.display  = '';
+    eneEl.style.display = '';
   }
 
   /* ────────────────────────────────────────────────────────────── */
@@ -345,6 +362,7 @@
 
       if (!hasGameStarted) {
         hasGameStarted = true;
+        updateFleetCounters();
         if (myRole === 'host') {
           setMyTurn(true);
           updateHeader(gameCode, 'Your Turn');
@@ -352,6 +370,7 @@
         }
       } else {
         // Reconnected — host syncs whose turn it is
+        updateFleetCounters();
         updateHeader(gameCode, myTurn ? 'Your Turn' : 'Wait for your turn...');
         if (myRole === 'host') {
           dataChannel.send(JSON.stringify({ type: 'resync', hostTurn: myTurn }));
@@ -427,8 +446,13 @@
         playSound(hit);
         if (hit) destroyedSquares.add(squadId);
 
-        // Send hit/miss result back so attacker can update their ocean grid
-        dataChannel.send(JSON.stringify({ type: 'result', cellId: msg.cellId, hit }));
+        // Detect if this hit sank an entire ship
+        const sunk = hit && shipCells.some(cells =>
+          cells.includes(squadId) && cells.every(id => destroyedSquares.has(id))
+        );
+
+        updateFleetCounters();
+        dataChannel.send(JSON.stringify({ type: 'result', cellId: msg.cellId, hit, sunk }));
 
         if (occupiedSquares.every(s => destroyedSquares.has(s))) {
           // All our ships destroyed — we lost
@@ -446,6 +470,8 @@
         if (cell) cell.classList.add(msg.hit ? 'explosion' : 'water');
         playSound(msg.hit);
         attackedCells.add(msg.cellId);
+        if (msg.sunk) opponentSunk++;
+        updateFleetCounters();
         setMyTurn(false); // wait for opponent's turn
         break;
       }
@@ -459,6 +485,7 @@
         // Received after reconnect — host tells us whose turn it is
         setMyTurn(!msg.hostTurn);
         updateHeader(gameCode, myTurn ? 'Your Turn' : 'Wait for your turn...');
+        updateFleetCounters();
         break;
     }
   }

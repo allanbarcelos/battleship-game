@@ -1,57 +1,47 @@
 # Battleship Game
 
-Português | [English](README.pt.md)
+Português | [English](README.md)
+
+**[Jogar o Demo](https://allanbarcelos.github.io/battleship-game)**
 
 ## Descrição
 
-Este é um jogo de batalha naval multiplayer baseado em navegador, desenvolvido com HTML, CSS, JavaScript e Socket.IO. Os jogadores podem se enfrentar colocando seus navios em um tabuleiro e tentando adivinhar a localização dos navios do oponente para afundá-los.
+Jogo de batalha naval multiplayer que roda inteiramente no navegador — sem servidor. A conexão entre jogadores é estabelecida via WebRTC (peer-to-peer), usando o [ntfy.sh](https://ntfy.sh) apenas como canal de sinalização temporário para trocar dados de conexão. Assim que o jogo começa, todo o tráfego flui diretamente entre os browsers.
 
 ## Funcionalidades
 
-- Multiplayer online em tempo real.
-- Colocação aleatória de navios para cada jogador.
-- Efeitos sonoros de explosões e água para feedback visual.
-- Interface intuitiva e responsiva.
+- Multiplayer P2P sem servidor via WebRTC DataChannel.
+- Posicionamento aleatório dos navios para cada jogador.
+- Timer de turno com auto-ataque ao expirar.
+- Persistência de sessão — recarregar a página reconecta automaticamente.
+- Chat entre os jogadores durante a partida.
+- Efeitos sonoros de explosão e água.
+- Indicador de conexão direta P2P ou via relay.
 
 ## Como Jogar
 
-1. Abra o jogo em dois navegadores ou dispositivos diferentes.
-2. Insira o mesmo código de jogo em ambos os dispositivos para se conectarem ao mesmo jogo.
-3. Cada jogador deve colocar seus navios no tabuleiro.
-4. Clique nas células do tabuleiro do oponente para atacar.
-5. Afunde todos os navios do oponente para vencer.
+1. Abra o [demo](https://allanbarcelos.github.io/battleship-game) no navegador.
+2. Clique em **Start Game** — um código de 10 caracteres é gerado automaticamente.
+3. Compartilhe o código com seu oponente.
+4. O oponente insere o código e clica em **Start Game** para entrar.
+5. Clique nas células do tabuleiro inimigo para atacar, alternando os turnos.
+6. Afunde todos os navios do oponente para vencer.
 
-## Instalação e Execução
+## Executar Localmente
 
-1. Clone o repositório:
+Sem build ou servidor necessário — basta abrir o `index.html` no navegador:
 
-   ```bash
-   git clone https://github.com/allanbarcelos/battleship-game.git
-   ```
+```bash
+git clone https://github.com/allanbarcelos/battleship-game.git
+cd battleship-game
+open index.html
+```
 
-2. Instale as dependências:
+## Tecnologias
 
-   ```bash
-   npm install
-   ```
-
-3. Execute o servidor:
-
-   ```bash
-   npm start
-   ```
-
-4. Abra o jogo em um navegador:
-
-   ```bash
-   http://localhost:3000
-   ```
-
-## Dependências
-
-- Node.js
-- Express
-- Socket.IO
+- JavaScript puro (sem frameworks, sem dependências)
+- WebRTC (`RTCPeerConnection` + `RTCDataChannel`)
+- [ntfy.sh](https://ntfy.sh) para sinalização (troca de SDP + ICE apenas)
 
 ## Autores
 

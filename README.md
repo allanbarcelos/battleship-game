@@ -2,56 +2,46 @@
 
 [Português](README.pt.md) | English
 
+**[Play the Demo](https://allanbarcelos.github.io/battleship-game)**
+
 ## Description
 
-This is a multiplayer online Battleship game, developed with HTML, CSS, JavaScript, and Socket.IO. Players can battle each other by placing their ships on a grid and trying to guess the location of their opponent's ships to sink them.
+Multiplayer Battleship game that runs entirely in the browser — no server required. Connection between players is established via WebRTC (peer-to-peer), using [ntfy.sh](https://ntfy.sh) only as a temporary signaling channel to exchange connection data. Once the game starts, all traffic flows directly between browsers.
 
 ## Features
 
-- Real-time online multiplayer.
+- Serverless P2P multiplayer via WebRTC DataChannel.
 - Random ship placement for each player.
-- Explosive and water sound effects for visual feedback.
-- Intuitive and responsive interface.
+- Turn timer with auto-attack on timeout.
+- Session persistence — reloading the page reconnects automatically.
+- In-game chat between players.
+- Explosion and water sound effects.
+- Shows whether the connection is direct P2P or relayed.
 
 ## How to Play
 
-1. Open the game in two different browsers or devices.
-2. Enter the same game code in both devices to connect to the same game.
-3. Each player must place their ships on the board.
-4. Click on the opponent's board cells to attack.
-5. Sink all of the opponent's ships to win.
+1. Open the [demo](https://allanbarcelos.github.io/battleship-game) in your browser.
+2. Click **Start Game** — a 10-character code is generated automatically.
+3. Share the code with your opponent.
+4. Your opponent enters the code and clicks **Start Game** to join.
+5. Take turns clicking the opponent's grid to attack.
+6. Sink all enemy ships to win.
 
-## Installation and Running
+## Running Locally
 
-1. Clone the repository:
+No build step or server needed — just open `index.html` in a browser:
 
-   ```bash
-   git clone https://github.com/allanbarcelos/battleship-game.git
-   ```
+```bash
+git clone https://github.com/allanbarcelos/battleship-game.git
+cd battleship-game
+open index.html
+```
 
-2. Install dependencies:
+## Tech Stack
 
-   ```bash
-   npm install
-   ```
-
-3. Run the server:
-
-   ```bash
-   npm start
-   ```
-
-4. Open the game in a browser:
-
-   ```bash
-   http://localhost:3000
-   ```
-
-## Dependencies
-
-- Node.js
-- Express
-- Socket.IO
+- Vanilla JavaScript (no frameworks, no dependencies)
+- WebRTC (`RTCPeerConnection` + `RTCDataChannel`)
+- [ntfy.sh](https://ntfy.sh) for signaling (SDP + ICE exchange only)
 
 ## Authors
 

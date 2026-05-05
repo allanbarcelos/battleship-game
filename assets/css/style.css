@@ -3,7 +3,10 @@
   --grid-columns: 26;
   --cell-size: 20px;
   --cell-gap: 1px;
-  --grid-width: 598px;       /* (26 * 20) + (27 * 1) + 2px border */
+  /* As colunas usam 1fr, então a célula renderizada = 598 / 26 ≈ 23px, não 20px.
+     --cell-size só define a altura das células (height); a largura vem do 1fr.
+     O valor 23 também é hardcoded em CELL_PX no script.js para posicionar sprites. */
+  --grid-width: 598px;       /* 26 colunas × 23px ≈ 598px (ver CELL_PX em script.js) */
   --header-width: 598px;
   --header-height: 150px;
   --modal-max-width: 400px;
@@ -101,13 +104,51 @@
 .header #board-label {
   grid-area: 3 / 3 / 4 / 5;
   display: flex;
-  justify-content: center;
-  align-items: end;
+  flex-direction: column;
+  justify-content: end;
+  align-items: center;
 }
 
-.header #board-label span {
+.header #board-label > span:first-child {
   font-size: 1.6em;
   text-transform: capitalize;
+}
+
+/* ── Turn timer ────────────────────────────────────────────── */
+#turn-timer {
+  font-size: 1.05em;
+  font-variant-numeric: tabular-nums;
+  color: #555;
+  min-height: 1.2em;
+  line-height: 1;
+}
+
+#turn-timer.timer-urgent {
+  color: #c0392b;
+  font-weight: bold;
+}
+
+/* ── Connection indicator ──────────────────────────────────── */
+#conn-indicator {
+  grid-area: 1 / 3 / 2 / 5;
+  align-self: center;
+  justify-self: center;
+  font-size: 0.72em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+#conn-indicator.conn-p2p {
+  color: #27ae60;
+  background: #eafaf1;
+  border: 1px solid #a9dfbf;
+}
+
+#conn-indicator.conn-relay {
+  color: #e67e22;
+  background: #fef9e7;
+  border: 1px solid #f9e4b7;
 }
 
 /* ── Grid ──────────────────────────────────────────────────── */

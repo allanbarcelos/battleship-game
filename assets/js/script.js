@@ -8,8 +8,8 @@
   /* ── Constants ───────────────────────────────────────────────── */
   const GRID_SIZE = 26;
   const MAX_CELLS = GRID_SIZE * GRID_SIZE;
-  const CELL_PX = 23;
   const NTFY = 'https://ntfy.sh';
+  const TURN_SECONDS = 30;
 
   /* ── DOM ─────────────────────────────────────────────────────── */
   const grids = document.getElementsByClassName('grid');
@@ -37,6 +37,12 @@
   const waterAudio = new Audio('assets/audio/water.mp3');
 
   /* ── Ships definition ────────────────────────────────────────── */
+  // Frame encoda a máscara do navio como string:
+  //   '1' = célula ocupada, '0' = célula vazia (bounding-box), 'E' = separador de linha.
+  // Exemplo: '0010000E1111111' → 2 linhas, 7 colunas.
+  //   linha 1: 0 0 1 0 0 0 0   (torre/bridge)
+  //   linha 2: 1 1 1 1 1 1 1   (casco completo)
+  // O bounding-box é w×h para dimensionar o sprite; '1's dentro marcam as células ocupadas.
   const ships = [
     { class: 'cruzader',  frame: { h: '0010000E1111111',          v: '01E01E01E11E01E01E01E01E' } },
     { class: 'aircraft',  frame: { h: '1111100E1111111E1111100',   v: '010E010E111E111E111E111E111' } },
@@ -53,6 +59,10 @@
   let remoteDescSet = false;
   const iceCandidateQueue = [];
   let signalingChain = Promise.resolve();
+
+  /* ── Turn timer state ───────────────────────────────────────── */
+  let turnTimer = null;
+  let turnTimeLeft = 0;
 
   /* ── Reconnection state ──────────────────────────────────────── */
   let hasGameStarted = false;
@@ -87,6 +97,8 @@
   /* Ship placement                                                 */
   /* ────────────────────────────────────────────────────────────── */
   function initShips() {
+    // Calculado em runtime para desacoplar de --grid-width no CSS.
+    const CELL_PX = Math.round(squadGrid.getBoundingClientRect().width / GRID_SIZE);
     ships.forEach(ship => {
       const direction = Math.random() < 0.5 ? 'h' : 'v';
       const frame = ship.frame[direction];
@@ -103,6 +115,8 @@
           y = +square.dataset.y;
         } while (h + y > GRID_SIZE || w + x > GRID_SIZE);
 
+        // +1 amplia a zona de verificação por 1 célula além do bounding-box para
+        // garantir que navios não fiquem adjacentes (buffer mínimo de 1 célula).
         for (let j = y; j < y + h + 1; j++) {
           for (let i = x; i < x + w + 1; i++) {
             const s = document.querySelector(`div[data-x="${i}"][data-y="${j}"]`);
@@ -159,6 +173,7 @@
     oceanGrid.classList.toggle('board-hidden', !myTurn);
     const labelSpan = document.querySelector('#board-label span');
     if (labelSpan) labelSpan.textContent = myTurn ? 'Ocean' : 'Your Squad';
+    if (value) startTurnTimer(); else stopTurnTimer();
   }
 
   function playSound(hit) {
@@ -211,6 +226,73 @@
     box.appendChild(msgEl);
     box.appendChild(rematchBtn);
     divHeader.insertBefore(box, divHeader.firstChild);
+  }
+
+  function startTurnTimer() {
+    stopTurnTimer();
+    turnTimeLeft = TURN_SECONDS;
+    renderTimerDisplay();
+    turnTimer = setInterval(() => {
+      turnTimeLeft--;
+      renderTimerDisplay();
+      if (turnTimeLeft <= 0) { stopTurnTimer(); autoAttack(); }
+    }, 1000);
+  }
+
+  function stopTurnTimer() {
+    if (turnTimer) { clearInterval(turnTimer); turnTimer = null; }
+    const el = document.getElementById('turn-timer');
+    if (el) { el.textContent = ''; el.className = ''; }
+  }
+
+  function renderTimerDisplay() {
+    const el = document.getElementById('turn-timer');
+    if (!el) return;
+    el.textContent = `0:${String(turnTimeLeft).padStart(2, '0')}`;
+    el.className = turnTimeLeft <= 10 ? 'timer-urgent' : '';
+  }
+
+  function autoAttack() {
+    if (!myTurn || !dataChannel || dataChannel.readyState !== 'open') return;
+    const candidates = squaresOcean.filter(s => !attackedCells.has(s.id));
+    if (!candidates.length) return;
+    const cell = candidates[Math.floor(Math.random() * candidates.length)];
+    setMyTurn(false);
+    dataChannel.send(JSON.stringify({ type: 'attack', cellId: cell.id }));
+  }
+
+  async function detectConnectionType() {
+    if (!peer) return null;
+    try {
+      const stats = await peer.getStats();
+      const localCandidates = {};
+      let activePair = null;
+      stats.forEach(r => {
+        if (r.type === 'local-candidate') localCandidates[r.id] = r;
+        if (r.type === 'candidate-pair' && r.nominated) activePair = r;
+      });
+      // Fallback: alguns browsers não marcam nominated, usamos state=succeeded
+      if (!activePair) {
+        stats.forEach(r => {
+          if (r.type === 'candidate-pair' && r.state === 'succeeded') activePair = r;
+        });
+      }
+      if (!activePair) return null;
+      const local = localCandidates[activePair.localCandidateId];
+      return local ? local.candidateType : null;
+    } catch (_) { return null; }
+  }
+
+  function showConnectionType(type) {
+    const el = document.getElementById('conn-indicator');
+    if (!el) return;
+    if (type === 'relay') {
+      el.textContent = 'via relay';
+      el.className = 'conn-relay';
+    } else if (type === 'host' || type === 'srflx' || type === 'prflx') {
+      el.textContent = 'P2P direto';
+      el.className = 'conn-p2p';
+    }
   }
 
   function makeid(length) {
@@ -392,8 +474,8 @@
   }
 
   function startSignaling() {
-    // Guest uses a 10-minute look-back to catch an offer already posted;
-    // host only wants live messages (answer + ICE from guest).
+    // Guest usa lookback de 10 min porque o host pode ter postado o offer antes do guest abrir a página.
+    // Host usa apenas 30 s — só precisa receber answer + ICE do guest, que chegam em tempo real.
     const sinceTs = Math.floor(Date.now() / 1000) - (myRole === 'guest' ? 600 : 30);
     signalingEs = new EventSource(`${NTFY}/${ntfyTopic()}/sse?since=${sinceTs}`);
 
@@ -404,9 +486,11 @@
         payload = JSON.parse(wrapper.message);
       } catch (_) { return; }
 
-      if (!payload || payload.from === myRole) return; // ignore own echoes
+      // ntfy.sh ecoa a própria mensagem de volta; ignoramos mensagens enviadas por nós mesmos.
+      if (!payload || payload.from === myRole) return;
 
-      // Process messages sequentially to preserve SDP → ICE ordering
+      // Promise chain garante que o SDP (offer/answer) seja processado antes dos ICE candidates,
+      // mesmo que o EventSource entregue as mensagens fora de ordem.
       signalingChain = signalingChain
         .then(() => handleSignaling(payload))
         .catch(() => {});
@@ -440,7 +524,8 @@
     if (remoteDescSet) {
       try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (_) {}
     } else {
-      // Buffer candidates until remote description is set
+      // RTCPeerConnection rejeita ICE candidates antes de ter remote description.
+      // Enfileiramos e aplicamos em flushIceCandidateQueue() logo após setRemoteDescription().
       iceCandidateQueue.push(candidate);
     }
   }
@@ -520,6 +605,8 @@
         hasGameStarted = true;
         updateFleetCounters();
         initChat();
+        // Detecta tipo de conexão após ICE estabilizar (2s de margem)
+        setTimeout(() => detectConnectionType().then(showConnectionType), 2000);
         if (myRole === 'host') {
           setMyTurn(true);
           updateHeader(gameCode, 'Your Turn');
@@ -529,10 +616,16 @@
         // Reconnected — host sends full board state to guest
         updateFleetCounters();
         updateHeader(gameCode, myTurn ? 'Your Turn' : 'Wait for your turn...');
+        // Detecta tipo de conexão após ICE estabilizar (2s de margem)
+        setTimeout(() => detectConnectionType().then(showConnectionType), 2000);
         if (myRole === 'host') {
           const hostShipsSunk = shipCells.filter(
             cells => cells.every(id => destroyedSquares.has(id))
           ).length;
+          // Perspectivas cruzadas no resync:
+          //   hostOceanHits/Misses   → células onde o host atacou (= squad do guest)
+          //   hostSquadDestroyed/Misses → células onde o guest atacou (= ocean do guest)
+          //   guestOpponentSunk = navios do host destruídos = "afundados pelo guest"
           dataChannel.send(JSON.stringify({
             type: 'resync',
             hostTurn:          myTurn,
@@ -568,6 +661,7 @@
     }
 
     reconnectAttempts++;
+    // Backoff exponencial com cap em 16s: 1 << n = 2^n sem dependência de Math.pow
     const delay = Math.min(1000 * (1 << (reconnectAttempts - 1)), 16000); // 1s 2s 4s 8s 16s
     setMyTurn(false);
     updateHeader(gameCode, `Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT})`);
@@ -579,6 +673,9 @@
       if (dataChannel) { try { dataChannel.close(); } catch (_) {} dataChannel = null; }
       if (peer)        { try { peer.close(); }        catch (_) {} peer = null; }
       if (signalingEs) { signalingEs.close(); signalingEs = null; }
+      // Limpa indicador de conexão — será re-detectado após reconexão
+      const connEl = document.getElementById('conn-indicator');
+      if (connEl) { connEl.textContent = ''; connEl.className = ''; }
 
       remoteDescSet = false;
       iceCandidateQueue.length = 0;
@@ -756,6 +853,8 @@
   /* ────────────────────────────────────────────────────────────── */
   function initUI() {
     startGameBtn.addEventListener('click', () => {
+      // `peer` já existindo = clique duplo enquanto conecta; `hasGameStarted` = jogo ativo.
+      // Ambas as guards evitam criar múltiplas conexões com o mesmo código.
       if (peer || hasGameStarted) return;
       startGameBtn.disabled = true;
       clearSavedState();
@@ -773,7 +872,7 @@
       const cellId = e.target.id;
       if (!cellId || !myTurn || attackedCells.has(cellId)) return;
       if (!dataChannel || dataChannel.readyState !== 'open') return;
-      setMyTurn(false); // optimistic lock to prevent double-click
+      setMyTurn(false); // trava otimista: desabilita o grid antes da resposta chegar para evitar duplo-ataque
       dataChannel.send(JSON.stringify({ type: 'attack', cellId }));
     });
 

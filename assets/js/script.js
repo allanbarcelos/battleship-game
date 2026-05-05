@@ -57,6 +57,7 @@
   let reconnectAttempts = 0;
   const MAX_RECONNECT = 5;
   let reconnectTimer = null;
+  let rematchPending = false;   // opponent requested rematch, waiting for our accept
 
   /* ────────────────────────────────────────────────────────────── */
   /* Grid                                                           */
@@ -187,12 +188,20 @@
 
     const box = document.createElement('div');
     box.id = 'box';
+
     const msgEl = document.createElement('p');
     msgEl.id = 'msg';
     msgEl.style.fontSize = '1.8em';
     msgEl.style.fontWeight = 'bold';
     msgEl.textContent = winner ? '🏆 You Win!' : '💀 You Lose!';
+
+    const rematchBtn = document.createElement('button');
+    rematchBtn.id = 'rematch-btn';
+    rematchBtn.textContent = 'Rematch';
+    rematchBtn.addEventListener('click', onRematchClick);
+
     box.appendChild(msgEl);
+    box.appendChild(rematchBtn);
     divHeader.insertBefore(box, divHeader.firstChild);
   }
 
@@ -211,6 +220,54 @@
     eneEl.innerHTML = `<span>Enemy Fleet</span><span class="fleet-count">${enemyRemaining} / ${ships.length}</span>`;
     meEl.style.display  = '';
     eneEl.style.display = '';
+  }
+
+  function onRematchClick() {
+    if (!dataChannel || dataChannel.readyState !== 'open') return;
+    const btn = document.getElementById('rematch-btn');
+    if (rematchPending) {
+      // Opponent already requested — accept it
+      dataChannel.send(JSON.stringify({ type: 'rematch-accept' }));
+      startRematch();
+    } else {
+      // Request rematch
+      dataChannel.send(JSON.stringify({ type: 'rematch-request' }));
+      if (btn) { btn.textContent = 'Waiting...'; btn.disabled = true; }
+    }
+  }
+
+  function startRematch() {
+    rematchPending = false;
+    gameEnded = false;
+    hasGameStarted = true;
+
+    // Reset state
+    occupiedSquares = [];
+    shipCells.length = 0;
+    attackedCells.clear();
+    destroyedSquares.clear();
+    opponentSunk = 0;
+
+    // Reset cell DOM classes
+    squaresSquad.forEach(s => s.classList.remove('explosion', 'water', 'occupied'));
+    squaresOcean.forEach(s => s.classList.remove('explosion', 'water'));
+
+    // Remove old ship sprites
+    squadGrid.querySelectorAll('span[data-ship]').forEach(s => s.remove());
+
+    // Place new ships randomly
+    initShips();
+    updateFleetCounters();
+
+    // Host always goes first on rematch (same as original start)
+    if (myRole === 'host') {
+      setMyTurn(true);
+      updateHeader(gameCode, 'Your Turn');
+      dataChannel.send(JSON.stringify({ type: 'start', yourTurn: false }));
+    } else {
+      setMyTurn(false);
+      updateHeader(gameCode, 'Wait for your turn...');
+    }
   }
 
   /* ────────────────────────────────────────────────────────────── */
@@ -424,10 +481,13 @@
   /* Game protocol over DataChannel                                 */
   /*                                                               */
   /* Message types:                                                 */
-  /*   start   → { yourTurn: bool }          sent by host on open  */
-  /*   attack  → { cellId: 'ocean-N' }       attacker → defender   */
-  /*   result  → { cellId, hit: bool }       defender → attacker   */
-  /*   defeat  → {}                          defender → attacker   */
+  /*   start           → { yourTurn: bool }   host on open/rematch  */
+  /*   attack          → { cellId }           attacker → defender   */
+  /*   result          → { cellId, hit, sunk} defender → attacker   */
+  /*   defeat          → {}                   defender → attacker   */
+  /*   chat            → { text }             either → other        */
+  /*   rematch-request → {}                   either → other        */
+  /*   rematch-accept  → {}                   either → other        */
   /* ────────────────────────────────────────────────────────────── */
   function handleGameMessage(msg) {
     switch (msg.type) {
@@ -491,6 +551,17 @@
 
       case 'chat':
         appendChatMessage(msg.text, false);
+        break;
+
+      case 'rematch-request': {
+        rematchPending = true;
+        const btn = document.getElementById('rematch-btn');
+        if (btn) { btn.textContent = 'Accept Rematch'; btn.disabled = false; }
+        break;
+      }
+
+      case 'rematch-accept':
+        startRematch();
         break;
     }
   }

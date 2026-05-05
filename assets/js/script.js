@@ -21,11 +21,14 @@
   /* ── Game state ──────────────────────────────────────────────── */
   const squaresSquad = [];
   const squaresOcean = [];
-  let occupiedSquares = [];     // squad-N cells our ships occupy
-  const shipCells = [];         // per-ship cell groups: [[id,…], …]
+  let occupiedSquares = [];           // squad-N cells our ships occupy
+  const shipCells = [];               // per-ship cell groups: [[id,…], …]
+  const spriteData = [];              // ship sprite info (for sessionStorage restore)
   let myTurn = false;
   const attackedCells = new Set();    // ocean-N cells we've attacked
+  const oceanHits = new Set();        // ocean-N cells confirmed as hits
   const destroyedSquares = new Set(); // squad-N cells of ours that were hit
+  const squadMisses = new Set();      // squad-N cells opponent missed
   let opponentSunk = 0;               // count of enemy ships we've sunk
   let gameEnded = false;
 
@@ -128,6 +131,11 @@
         }
       }
       shipCells.push(thisCells);
+      spriteData.push({
+        shipClass: ship.class, direction,
+        top: `${firstSquareTop}px`, left: `${firstSquareLeft}px`,
+        width: `${w * CELL_PX}px`, height: `${h * CELL_PX}px`,
+      });
 
       const shipDiv = document.createElement('span');
       shipDiv.style.width = `${w * CELL_PX}px`;
@@ -210,6 +218,92 @@
     return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
   }
 
+  /* ────────────────────────────────────────────────────────────── */
+  /* Session persistence (feature 6)                                */
+  /* ────────────────────────────────────────────────────────────── */
+  const SAVE_KEY = 'bsg-v1';
+
+  function saveState() {
+    if (!hasGameStarted || !gameCode) return;
+    try {
+      sessionStorage.setItem(SAVE_KEY, JSON.stringify({
+        gameCode, myRole,
+        occupiedSquares, shipCells, spriteData,
+        attackedCells:    [...attackedCells],
+        oceanHits:        [...oceanHits],
+        destroyedSquares: [...destroyedSquares],
+        squadMisses:      [...squadMisses],
+        opponentSunk, myTurn,
+      }));
+    } catch (_) {}
+  }
+
+  function loadState() {
+    try {
+      const raw = sessionStorage.getItem(SAVE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  }
+
+  function restoreState(s) {
+    gameCode         = s.gameCode;
+    myRole           = s.myRole;
+    occupiedSquares  = s.occupiedSquares;
+    shipCells.push(...s.shipCells);
+    spriteData.push(...s.spriteData);
+    s.attackedCells.forEach(id    => attackedCells.add(id));
+    s.oceanHits.forEach(id        => oceanHits.add(id));
+    s.destroyedSquares.forEach(id => destroyedSquares.add(id));
+    s.squadMisses.forEach(id      => squadMisses.add(id));
+    opponentSunk = s.opponentSunk;
+    myTurn       = s.myTurn;
+    hasGameStarted = true;
+
+    // Re-apply DOM state
+    s.occupiedSquares.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('occupied');
+    });
+    s.destroyedSquares.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('explosion');
+    });
+    s.squadMisses.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('water');
+    });
+    s.oceanHits.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('explosion');
+    });
+    const hitSet = new Set(s.oceanHits);
+    s.attackedCells.filter(id => !hitSet.has(id)).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('water');
+    });
+
+    // Restore ship sprites
+    s.spriteData.forEach(sd => {
+      const span = document.createElement('span');
+      span.style.cssText =
+        `width:${sd.width};height:${sd.height};position:absolute;top:${sd.top};left:${sd.left}`;
+      span.dataset.ship = sd.shipClass;
+      span.classList.add(`sprite-${sd.direction}`, `${sd.shipClass}-${sd.direction}`);
+      squadGrid.appendChild(span);
+    });
+
+    updateFleetCounters();
+    // Show correct board immediately (no animation — just sync CSS)
+    squadGrid.classList.toggle('board-hidden', myTurn);
+    oceanGrid.classList.toggle('board-hidden', !myTurn);
+    const labelSpan = document.querySelector('#board-label span');
+    if (labelSpan) labelSpan.textContent = myTurn ? 'Ocean' : 'Your Squad';
+  }
+
+  function clearSavedState() {
+    sessionStorage.removeItem(SAVE_KEY);
+  }
+
   function updateFleetCounters() {
     const myRemaining = shipCells.filter(cells => cells.some(id => !destroyedSquares.has(id))).length;
     const enemyRemaining = ships.length - opponentSunk;
@@ -241,11 +335,16 @@
     gameEnded = false;
     hasGameStarted = true;
 
+    clearSavedState();
+
     // Reset state
     occupiedSquares = [];
     shipCells.length = 0;
+    spriteData.length = 0;
     attackedCells.clear();
+    oceanHits.clear();
     destroyedSquares.clear();
+    squadMisses.clear();
     opponentSunk = 0;
 
     // Reset cell DOM classes
@@ -427,11 +526,23 @@
           dataChannel.send(JSON.stringify({ type: 'start', yourTurn: false }));
         }
       } else {
-        // Reconnected — host syncs whose turn it is
+        // Reconnected — host sends full board state to guest
         updateFleetCounters();
         updateHeader(gameCode, myTurn ? 'Your Turn' : 'Wait for your turn...');
         if (myRole === 'host') {
-          dataChannel.send(JSON.stringify({ type: 'resync', hostTurn: myTurn }));
+          const hostShipsSunk = shipCells.filter(
+            cells => cells.every(id => destroyedSquares.has(id))
+          ).length;
+          dataChannel.send(JSON.stringify({
+            type: 'resync',
+            hostTurn:          myTurn,
+            hostOceanHits:     [...oceanHits],
+            hostOceanMisses:   [...attackedCells].filter(id => !oceanHits.has(id)),
+            hostSquadDestroyed:[...destroyedSquares],
+            hostSquadMisses:   [...squadMisses],
+            hostOpponentSunk:  opponentSunk,
+            guestOpponentSunk: hostShipsSunk,
+          }));
         }
       }
     };
@@ -495,6 +606,7 @@
       case 'start':
         setMyTurn(msg.yourTurn);
         updateHeader(gameCode, msg.yourTurn ? 'Your Turn' : 'Wait for your turn...');
+        saveState();
         break;
 
       case 'attack': {
@@ -506,6 +618,7 @@
         if (cell) cell.classList.add(hit ? 'explosion' : 'water');
         playSound(hit);
         if (hit) destroyedSquares.add(squadId);
+        else     squadMisses.add(squadId);
 
         // Detect if this hit sank an entire ship
         const sunk = hit && shipCells.some(cells =>
@@ -513,6 +626,7 @@
         );
 
         updateFleetCounters();
+        saveState();
         dataChannel.send(JSON.stringify({ type: 'result', cellId: msg.cellId, hit, sunk }));
 
         if (occupiedSquares.every(s => destroyedSquares.has(s))) {
@@ -531,8 +645,10 @@
         if (cell) cell.classList.add(msg.hit ? 'explosion' : 'water');
         playSound(msg.hit);
         attackedCells.add(msg.cellId);
+        if (msg.hit) oceanHits.add(msg.cellId);
         if (msg.sunk) opponentSunk++;
         updateFleetCounters();
+        saveState();
         setMyTurn(false); // wait for opponent's turn
         break;
       }
@@ -542,12 +658,48 @@
         showGameOver(true);
         break;
 
-      case 'resync':
-        // Received after reconnect — host tells us whose turn it is
+      case 'resync': {
+        // Full board state from host — clear and reapply
+        squaresSquad.forEach(s => s.classList.remove('explosion', 'water'));
+        squaresOcean.forEach(s => s.classList.remove('explosion', 'water'));
+        destroyedSquares.clear(); squadMisses.clear();
+        attackedCells.clear();    oceanHits.clear();
+
+        // Restore squad grid (where host attacked us)
+        msg.hostOceanHits.forEach(oId => {
+          const sId = oId.replace('ocean', 'squad');
+          destroyedSquares.add(sId);
+          const el = document.getElementById(sId);
+          if (el) el.classList.add('explosion');
+        });
+        msg.hostOceanMisses.forEach(oId => {
+          const sId = oId.replace('ocean', 'squad');
+          squadMisses.add(sId);
+          const el = document.getElementById(sId);
+          if (el) el.classList.add('water');
+        });
+
+        // Restore ocean grid (where we attacked host)
+        msg.hostSquadDestroyed.forEach(sId => {
+          const oId = sId.replace('squad', 'ocean');
+          oceanHits.add(oId); attackedCells.add(oId);
+          const el = document.getElementById(oId);
+          if (el) el.classList.add('explosion');
+        });
+        msg.hostSquadMisses.forEach(sId => {
+          const oId = sId.replace('squad', 'ocean');
+          attackedCells.add(oId);
+          const el = document.getElementById(oId);
+          if (el) el.classList.add('water');
+        });
+
+        opponentSunk = msg.hostOpponentSunk;
         setMyTurn(!msg.hostTurn);
         updateHeader(gameCode, myTurn ? 'Your Turn' : 'Wait for your turn...');
         updateFleetCounters();
+        saveState();
         break;
+      }
 
       case 'chat':
         appendChatMessage(msg.text, false);
@@ -604,12 +756,11 @@
   /* ────────────────────────────────────────────────────────────── */
   function initUI() {
     startGameBtn.addEventListener('click', () => {
+      clearSavedState();
       const inputCode = gameCodeInput.value.trim().toUpperCase();
       if (inputCode.length === 10) {
-        // Join existing game as guest
         initP2P('guest', inputCode);
       } else {
-        // Create new game as host
         const code = makeid(10);
         gameCodeInput.value = code;
         initP2P('host', code);
@@ -643,6 +794,15 @@
 
   /* ── Boot ── */
   initGrid();
-  initShips();
-  initUI();
+  const _saved = loadState();
+  if (_saved) {
+    restoreState(_saved);
+    initUI();
+    isReconnecting = true;
+    initP2P(_saved.myRole, _saved.gameCode);
+    updateHeader(_saved.gameCode, 'Reconnecting...');
+  } else {
+    initShips();
+    initUI();
+  }
 })();

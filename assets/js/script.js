@@ -9,6 +9,7 @@
   const GRID_SIZE = 26;
   const MAX_CELLS = GRID_SIZE * GRID_SIZE;
   const NTFY = 'https://ntfy.sh';
+  const TURN_CREDENTIALS_URL = 'https://rough-grass-f40b.allan-d68.workers.dev';
   const TURN_SECONDS = 30;
 
   /* ── DOM ─────────────────────────────────────────────────────── */
@@ -541,6 +542,20 @@
   /* ────────────────────────────────────────────────────────────── */
   /* P2P connection setup                                           */
   /* ────────────────────────────────────────────────────────────── */
+  async function fetchIceServers() {
+    try {
+      const res = await fetch(TURN_CREDENTIALS_URL);
+      if (!res.ok) throw new Error('turn-fetch-failed');
+      return await res.json();
+    } catch (_) {
+      // fallback: Google STUN only (P2P direto; pode falhar em CGNAT)
+      return [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ];
+    }
+  }
+
   async function initP2P(role, code) {
     myRole = role;
     gameCode = code;
@@ -548,16 +563,8 @@
     iceCandidateQueue.length = 0;
     signalingChain = Promise.resolve();
 
-    peer = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        // Public TURN relay for users behind symmetric NAT / strict firewalls
-        { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
-        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-      ],
-    });
+    const iceServers = await fetchIceServers();
+    peer = new RTCPeerConnection({ iceServers });
 
     peer.onicecandidate = ({ candidate }) => {
       if (candidate) postSignal({ type: 'ice', from: myRole, candidate: candidate.toJSON() });
